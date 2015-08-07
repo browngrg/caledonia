@@ -1,0 +1,25 @@
+# Mfia6: Wang-Landau Sampling of Ising model with LR term.
+# process id: 15508
+# mpi enabled: 1
+# mpi nproc: 5
+# start time: Thu Jun 25 13:34:14 2015
+# stop time: unfinished
+help= 0
+verbose= 0
+input=   
+output= ProgramOptionsOut.txt
+dim= 2
+length= 64
+jsign= 1
+H= 0
+A= 0
+Elo= -8192
+Ehi= 8192
+Ebin= 10
+numwin= 5
+numwalk= 10
+overlap= 0.75
+nchunk= 5000000
+Q= 0.05
+maxupdate= 30
+TMupdate= 1

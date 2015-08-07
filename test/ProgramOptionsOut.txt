@@ -1,0 +1,21 @@
+# Test_ProgramOptions: Test MPI Bcast of options
+# process id: 6072
+# mpi enabled: 1
+# mpi nproc: 1
+# start time: Fri Aug  7 09:19:03 2015
+# write time: Fri Aug  7 09:19:03 2015
+# wall time: 0 seconds
+# process time: 0.078 seconds
+# resident memory = 105984 KBytes
+help= 0
+verbose= 0
+input= 
+output= ProgramOptionsOut.txt
+bool= 1
+int= 10
+long= 1000
+float= 3.14153
+double= 23.1392
+str1= first
+str2= second
+str3= thrid

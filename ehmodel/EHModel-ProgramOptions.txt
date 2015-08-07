@@ -1,0 +1,21 @@
+# EHModel: Wang-Landau Sampling.
+help= 0
+verbose= 0
+input= ProgramOptionsIn.txt
+output= ProgramOptionsOut.txt
+H= 0
+ehfile= EHModel-Ni2MnGa.txt
+ehfilet= EHModelPairs
+Elo= -1400
+Ehi= 0
+Ebin= 1
+numwin= 5
+numwalk= 16
+overlap= 0.5
+nchunk= 100000
+Q= 0.1
+maxupdate= 15
+update= 1
+useITTM= 0
+bywindow= 0
+#estdos= SeedDOS.csv
