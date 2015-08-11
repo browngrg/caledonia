@@ -43,9 +43,9 @@ public:
       if( pool.group!=MPI_GROUP_NULL ) MPI_Group_free(&pool.group);
       if( gang.group!=MPI_GROUP_NULL ) MPI_Group_free(&gang.group);
       if( lead.group!=MPI_GROUP_NULL ) MPI_Group_free(&lead.group);
-      if(  pool.comm!=MPI_COMM_NULL  ) MPI_Comm_free(&pool.comm);
-      if(  gang.comm!=MPI_COMM_NULL  ) MPI_Comm_free(&gang.comm);
-      if(  lead.comm!=MPI_COMM_NULL  ) MPI_Comm_free(&lead.comm);
+      if(  pool.comm!=MPI_COMM_NULL && pool.comm!=MPI_COMM_WORLD ) MPI_Comm_free(&pool.comm);
+      if(  gang.comm!=MPI_COMM_NULL && pool.comm!=MPI_COMM_WORLD ) MPI_Comm_free(&gang.comm);
+      if(  lead.comm!=MPI_COMM_NULL && pool.comm!=MPI_COMM_WORLD ) MPI_Comm_free(&lead.comm);
 #     endif
    }
 

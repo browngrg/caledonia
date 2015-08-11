@@ -18,6 +18,7 @@
 #include <cmath>
 #include <string>
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <sstream>
 #include <getopt.h>
@@ -98,6 +99,9 @@ public:
    void WriteWLDOS(const Walker& walker, int iupdate);
 
    template<typename Walker>
+   void WriteWLBoltzmann(const Walker& walker, int iupdate);
+
+   template<typename Walker>
    void WriteWalkers(const std::vector<Walker>& walker, int iupdate);
 
    template<typename Walker>
@@ -119,6 +123,8 @@ public:
    double wleta;                       // weighting between WL and ITTM. See Eq. (24) of
                                        // RG Ghulghazaryan, S. Hayryan, CK Hu, J Comp Chem 28,  715-726 (2007)
    bool output_configs;
+
+   double kTlo, kThi;                  // Range of output temperatures for WriteWLBoltzmann
 
    // Windowing information
    int NWindow;                           // Total number of windows
@@ -175,6 +181,8 @@ MC_WangLandau::MC_WangLandau()
    Ehi      = -std::numeric_limits<double>::max();
    Ebin     = 1.;
    fwinover = 0.5;                                         // fractional overlap, maximal for M/(M+1)
+   kTlo     = 0.5;
+   kThi     = 5.0;
 }
 
 
@@ -207,6 +215,8 @@ void MC_WangLandau::copy(const MC_WangLandau& orig)
    LinearInterp = orig.LinearInterp;
    ittm = orig.ittm;
    output_configs = orig.output_configs;
+   kTlo = orig.kTlo;
+   kThi = orig.kThi;
 }
 
 
@@ -516,6 +526,73 @@ void MC_WangLandau::WriteWLDOS(const Walker& walker, int iupdate)
    }
 }
 
+template<typename Walker>
+void MC_WangLandau::WriteWLBoltzmann(const Walker& walker, int iupdate)
+{
+   const bool global = ( walker.window.iwindow<0 );
+   if( !global ) return;
+   if( mp_window.pool.iproc!=0) return;
+   // Write the data
+   char fname[100];
+   if( walker.wlgamma==0 && iupdate<1 ) iupdate = 1;                          // save at least one WL stage
+   sprintf(fname,"WLBoltzmann-%02d.csv",iupdate);                             // Global output
+   std::ofstream fout(fname);
+   fout << "# Wang-Landau thermodynamic properties calculated via Boltzmann sum" << std::endl;
+   fout << "# V = NSite = " << walker.now.V << std::endl;
+   fout << "# Wang-Landau gamma = " << walker.wlgamma << std::endl;
+   fout << "# iupdate = " << iupdate << std::endl;
+   fout << "# Column 1: Temperature in energy units of original data" << std::endl;
+   fout << "# Column 2: Specific heat from <E^2>-<E>^2" << std::endl;
+   fout << "# Column 3: Entropy S(E)" << std::endl;
+   fout << "# Column 4: microcanonical energy E" << std::endl;
+   fout << "# Column 5: Helmholtz free energy A = E-kT*S" << std::endl;
+   fout << "# Column 6: beta = 1/kT" << std::endl;
+   fout << "# Column 7: gamma = -(kT)^2*C" << std::endl;
+   fout.precision(15);
+   const int nKTpt = 500;
+   const double dkT = (kThi-kTlo)/static_cast<double>(nKTpt-1);
+   const int npt = walker.S.size();
+   if(npt<3) return;
+   std::vector<double> E(npt);
+   for(int i=0; i<npt; i++) E[i] = walker.window.unbin(i);
+   std::vector<double> lng(npt);
+   for(int i=0; i<npt; i++) lng[i] = walker.S[i] + walker.Sfixed[i];
+   std::vector<double> A(npt);
+   for(int ikt=0; ikt<nKTpt; ikt++)
+   {
+      double kT = kTlo + ikt*dkT;
+      for(int i=0; i<npt; i++) A[i] = E[i] - kT*lng[i]; 
+      double Amin = std::numeric_limits<double>::max();
+      for(int i=0; i<npt; i++) Amin = std::min(Amin,A[i]);
+      for(int i=0; i<npt; i++) A[i] -= Amin;
+      double Z = 0;
+      double E1 = 0;
+      double E2 = 0;
+      double A1 = 0;
+      double beta = 1./kT;
+      for(int i=0; i<npt; i++)
+      {
+         double boltz = std::exp(-A[i]/kT);
+         Z  += boltz;
+         E1 += boltz*E[i];
+         E2 += boltz*E[i]*E[i];
+         A1 += boltz*A[i];
+      }
+      E1 /= Z;
+      E2 /= Z;
+      A1 /= Z;
+      double C = E2-E1*E1;
+      double gamma = -C*kT*kT;
+      fout << std::setw(20) << kT << " "
+           << std::setw(20) << C << " "
+           << std::setw(20) << lng[ikt] << " "
+           << std::setw(20) << E1 << " "
+           << std::setw(20) << A1 << " "
+           << std::setw(20) << beta << " "
+           << std::setw(20) << gamma << std::endl;
+   }
+}
+
 
 template<typename Walker>
 void MC_WangLandau::WriteWalkers(const std::vector<Walker>& walkerpool, int iupdate)
@@ -610,11 +687,6 @@ void MC_WangLandau::DoConstrictorSample(Model& model, std::vector<Walker>& walke
             }
          }
          if( mp_window.gang.iproc==0 ) std::cout << "Constrictor iproc=" << mp_window.pool.iproc << " iwindow=" << iwin << " ilft=" << ilft << " irgt=" << irgt << " converge=" << converged[iwin] << std::endl;
-         //if( mp_window.gang.iproc==0 )
-         //{
-         //   int iupdate = 0;
-         //   WriteWLDOS(average,iupdate);
-         //}
       }
       all_converged = true;
       for(int i=0; all_converged && i<converged.size(); i++) all_converged = all_converged && converged[i];
@@ -628,6 +700,7 @@ void MC_WangLandau::DoConstrictorSample(Model& model, std::vector<Walker>& walke
    global_walker.wlgamma = walkerpool[0].wlgamma;
    int iupdate = 0;
    WriteWLDOS(global_walker,iupdate);
+   WriteWLBoltzman(global_walker,iupdate);
    for(int iwalk=0; iwalk<NWalker; iwalk++) 
    {
       std::fill(walkerpool[iwalk].h.begin(),walkerpool[iwalk].h.end(),0);
@@ -723,6 +796,7 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
       double WLQ = DoAnalyzeMPI(walkerpool,global_walker);
       global_walker.wlgamma = walkerpool[0].wlgamma;
       WriteWLDOS(global_walker,iupdate);
+      WriteWLBoltzmann(global_walker,iupdate);
       if( output_configs ) WriteWalkers(walkerpool,iupdate);
       DoReplicaExchange(model,walkerpool);
       // Decide about advancing WL parameter
@@ -815,7 +889,6 @@ double MC_WangLandau::DoAnalyze(std::vector<WLWalker>& walkerpool, WLWalker& ave
    double NWT = static_cast<double>(mp_window.gang.nproc*NWalkPerProcess); 
    if( mp_window.ngang==1 ) NWT = beginwin[iwin+1] - beginwin[iwin];
    for(int j=0; j<average.S.size(); j++) average.S[j] /= NWT;
-   if(verbose) std::cout << __FILE__ << ":" << __LINE__ << std::endl;
    long long htot = 0; for(int i=0; i<average.h.size(); i++) htot += average.h[i];
    double Q = TMAnalyze(average);                                                                     // TTT Violation
    double RMSQ = std::sqrt(static_cast<double>(average.h.size())/static_cast<double>(htot));          // sqrt(N) fluctuations
