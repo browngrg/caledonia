@@ -5,6 +5,7 @@
 #include "ITTM.hpp"
 #include "WL_Walker.hpp"
 #include "WL_Window.hpp"
+#include "MPI_Struct.hpp"
 #include "MPI_Gang.hpp"
 #include "Random.hpp"
 #include "Null_Measure.hpp"
@@ -214,7 +215,7 @@ void MC_WangLandau::copy(const MC_WangLandau& orig)
 template<typename Model, typename Walker>
 void MC_WangLandau::DoIntoWindow(Model& model, Walker& walker)
 {
-   const bool verbose = (this->verbose_debug) && (this->verbose) && (mp_window.iproc_pool==0);
+   const bool verbose = (this->verbose_debug) && (this->verbose) && (mp_window.pool.iproc==0);
    if(walker.sigma.size()<1)
    {
       int NSite = walker.sigma.size();
@@ -281,7 +282,7 @@ void MC_WangLandau::DoWangLandau(Model& model, Walker& walker, long long nstep)
 template<typename Model, typename Walker, typename MeasureObj>
 void MC_WangLandau::DoWangLandau(Model& model, Walker& walker, long long nstep, MeasureObj& measure)
 {
-   const bool verbose = (this->verbose_debug) && (this->verbose) && (mp_window.iproc_pool==0);   // debugging
+   const bool verbose = (this->verbose_debug) && (this->verbose) && (mp_window.pool.iproc==0);   // debugging
    if(walker.sigma.size()<1)
    {
       int NSite= walker.sigma.size();
@@ -434,12 +435,11 @@ void MC_WangLandau::WriteWLDOS(const Walker& walker, int iupdate)
 {
    ittm.write();
    const bool global = ( walker.window.iwindow<0 );
-   if( global && mp_window.iproc_pool!=0) return;
-   if(mp_window.iproc_gang!=0) return;
+   if( global && mp_window.pool.iproc!=0) return;
+   if(mp_window.gang.iproc!=0) return;
    // Find normalization due to number of sites
-   int V = walker.now.V;   // Volume of system = NSite
+   double V = walker.now.V;   // Volume of system = NSite
    if(V<1) V=1;
-   double rV = 1./static_cast<double>(V);
    // Find the normalization for the histogram
    long long htot = 0;
    int hbin = 0;
@@ -508,7 +508,7 @@ void MC_WangLandau::WriteWLDOS(const Walker& walker, int iupdate)
          double Stm = sittm[ibin] - S2max;
          double S = Sadd[ibin] - Smax;
          double h = hnorm*walker.h[ibin];
-         out << walker.window.unbin(ibin) << " " << S << " " << rV*S 
+         out << walker.window.unbin(ibin) << " " << S << " " << S/V 
              << " " << walker.h[ibin] << " " << h << " " << ibin 
              << " " << Stm << " " << vttt[ibin] 
              << " " << Sfx << " " << Swl << std::endl;
@@ -520,11 +520,11 @@ void MC_WangLandau::WriteWLDOS(const Walker& walker, int iupdate)
 template<typename Walker>
 void MC_WangLandau::WriteWalkers(const std::vector<Walker>& walkerpool, int iupdate)
 {
-   if( mp_window.iproc_pool>10 && mp_window.iproc_gang!=0 ) return;
+   if( mp_window.pool.iproc>10 && mp_window.gang.iproc!=0 ) return;
    char fname[100];
-   sprintf(fname,"MC_WangLandauConfig-%02d-%02d.txt",mp_window.iproc_pool,iupdate);
+   sprintf(fname,"MC_WangLandauConfig-%02d-%02d.txt",mp_window.pool.iproc,iupdate);
    std::ofstream fout(fname);
-   fout << "# Configurations from processor " << mp_window.iproc_pool << " at update " << iupdate << std::endl;
+   fout << "# Configurations from processor " << mp_window.pool.iproc << " at update " << iupdate << std::endl;
    fout << "# Energy followed by values of microconfiguration sigma" << std::endl;
    for(int iwalk=0; iwalk<walkerpool.size(); iwalk++)
    {
@@ -585,7 +585,7 @@ void MC_WangLandau::DoConstrictorSample(Model& model, std::vector<Walker>& walke
          if( mp_window.ngang>1 )
          {
             std::vector<double> mpi_buffer_d(average.h.size(),0);
-            MPI_Allreduce(&(average.h[0]),&(mpi_buffer_d[0]),average.h.size(),MPI_DOUBLE,MPI_SUM,mp_window.comm_gang);
+            if(mp_window.gang.in()) PI_Allreduce(&(average.h[0]),&(mpi_buffer_d[0]),average.h.size(),MPI_DOUBLE,MPI_SUM,mp_window.gang.comm);
             for(int j=0; j<average.h.size(); j++) average.h[j] = mpi_buffer_d[j];
          }
 #        endif
@@ -609,8 +609,8 @@ void MC_WangLandau::DoConstrictorSample(Model& model, std::vector<Walker>& walke
                walkerpool[iwalk].WEmax = average.WEmax;
             }
          }
-         if( mp_window.iproc_gang==0 ) std::cout << "Constrictor iproc=" << mp_window.iproc_pool << " iwindow=" << iwin << " ilft=" << ilft << " irgt=" << irgt << " converge=" << converged[iwin] << std::endl;
-         //if( mp_window.iproc_gang==0 )
+         if( mp_window.gang.iproc==0 ) std::cout << "Constrictor iproc=" << mp_window.pool.iproc << " iwindow=" << iwin << " ilft=" << ilft << " irgt=" << irgt << " converge=" << converged[iwin] << std::endl;
+         //if( mp_window.gang.iproc==0 )
          //{
          //   int iupdate = 0;
          //   WriteWLDOS(average,iupdate);
@@ -620,7 +620,7 @@ void MC_WangLandau::DoConstrictorSample(Model& model, std::vector<Walker>& walke
       for(int i=0; all_converged && i<converged.size(); i++) all_converged = all_converged && converged[i];
 #     ifdef USE_MPI
       bool local_converged = all_converged;
-      MPI_Allreduce(&local_converged,&all_converged,1,MPI_C_BOOL,MPI_LAND,MPI_COMM_WORLD);
+      if(mp_window.pool.in()) MPI_Allreduce(&local_converged,&all_converged,1,MPI_C_BOOL,MPI_LAND,mp_window.pool.comm);
 #     endif
    }
    Walker global_walker;
@@ -684,7 +684,7 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool)
 template<typename Model, typename WLWalker, typename Measure>
 void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, Measure& measure)
 {
-   //bool verbose = (this->verbose_debug) && (this->verbose) && (mp_window.iproc_pool==0);
+   //bool verbose = (this->verbose_debug) && (this->verbose) && (mp_window.pool.iproc==0);
    const int NWalker = walkerpool.size();
    if(verbose) std::cout << "wlgamma_start = " << wlgamma_start << std::endl;
    for(int iwalk=0; iwalk<NWalker; iwalk++)
@@ -731,7 +731,7 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
          ivisit += (global_walker.h[ibin]>0);
       double fvisit = static_cast<double>(ivisit)/static_cast<double>(global_walker.h.size());
       bool allvisit = (ivisit==global_walker.h.size());
-      if( mp_window.iproc_pool==0 )
+      if( mp_window.pool.iproc==0 )
       {
          double psecs = static_cast<double>(clock())/static_cast<double>(CLOCKS_PER_SEC);
          std::cout << "loop= " << iloop << " level=" << iupdate << " WLgamma=" << walkerpool[0].wlgamma << " WLQ=" << WLQ << " istep=" << istep << " visit=" << fvisit << " time = " << psecs << " secs" << std::endl;
@@ -784,7 +784,7 @@ double MC_WangLandau::DoAnalyze(std::vector<WLWalker>& walkerpool, WLWalker& ave
       WLQ = std::max(WLQ,WLAnalyze(walkerpool[iwalk]));                        // Normalized flatness from UGA13 Eq (14)
 #  ifdef USE_MPI
    double WLQ_local = WLQ; 
-   MPI_Allreduce(&WLQ_local,&WLQ,1,MPI_DOUBLE,MPI_MAX,mp_window.comm_gang);
+   MPI_Allreduce(&WLQ_local,&WLQ,1,MPI_DOUBLE,MPI_MAX,mp_window.gang.comm);
 #  endif
    average.copy( walkerpool[beginwin[iwin]] );
    average.EStepSum = 0;
@@ -804,15 +804,15 @@ double MC_WangLandau::DoAnalyze(std::vector<WLWalker>& walkerpool, WLWalker& ave
       if(verbose) std::cout << __FILE__ << ":" << __LINE__ << std::endl;
       // Should not reduce h(E) for regular WL, where need to test for flatness before averaging
       std::vector<double> mpi_buffer_d(average.h.size(),0);
-      MPI_Allreduce(&(average.h[0]),&(mpi_buffer_d[0]),average.h.size(),MPI_DOUBLE,MPI_SUM,mp_window.comm_gang);
+      MPI_Allreduce(&(average.h[0]),&(mpi_buffer_d[0]),average.h.size(),MPI_DOUBLE,MPI_SUM,mp_window.gang.comm);
       for(int j=0; j<average.h.size(); j++) average.h[j] = mpi_buffer_d[j];
       mpi_buffer_d.resize(average.S.size(),0);
-      MPI_Allreduce(&(average.S[0]),&(mpi_buffer_d[0]),average.S.size(),MPI_DOUBLE,MPI_SUM,mp_window.comm_gang);
+      MPI_Allreduce(&(average.S[0]),&(mpi_buffer_d[0]),average.S.size(),MPI_DOUBLE,MPI_SUM,mp_window.gang.comm);
       for(int j=0; j<average.S.size(); j++) average.S[j] = mpi_buffer_d[j];
       if(verbose) std::cout << __FILE__ << ":" << __LINE__ << std::endl;
    }
 #  endif
-   double NWT = static_cast<double>(mp_window.nproc_gang*NWalkPerProcess); 
+   double NWT = static_cast<double>(mp_window.gang.nproc*NWalkPerProcess); 
    if( mp_window.ngang==1 ) NWT = beginwin[iwin+1] - beginwin[iwin];
    for(int j=0; j<average.S.size(); j++) average.S[j] /= NWT;
    if(verbose) std::cout << __FILE__ << ":" << __LINE__ << std::endl;
@@ -846,14 +846,14 @@ double MC_WangLandau::DoAnalyzeMPI(std::vector<WLWalker>& walkerpool, WLWalker& 
          if(MBin!=walkerpool[iwalk].S.size()) std::cout << __FILE__ << ":" << __LINE__ << " Bad MBin" << std::endl;;
       int buff_size = 5*MBin+1;                                            // The plus one allows passing number of bins
       int tmp = buff_size;
-      MPI_Allreduce(&tmp,&buff_size,1,MPI_INT,MPI_MAX,MPI_COMM_WORLD);
+      if(mp_window.pool.in()) MPI_Allreduce(&tmp,&buff_size,1,MPI_INT,MPI_MAX,mp_window.pool.comm);
       std::vector<double> mpi_buffer_d(buff_size);
       // synchronize averagepool across all processes
       // Side effect of DoAnalyze is S=<S> and h=sum(h)
       for(int iwin=0; /*mp_window.ngang>1 &&*/ iwin<NWindow; iwin++)
       {
          // Assumes all windows have same NBin. 
-         int root = iwin*mp_window.nproc_gang;                                                            // broadcaster is first process of the window-gang
+         int root = iwin*mp_window.gang.nproc;                                                            // broadcaster is first process of the window-gang
          int NBin = averagepool[iwin].S.size();
          // Can we avoid transmitting these?
          averagepool[iwin].Sittm.resize(NBin);                                                            // may not have been set yet
@@ -863,7 +863,7 @@ double MC_WangLandau::DoAnalyzeMPI(std::vector<WLWalker>& walkerpool, WLWalker& 
          for(int ibin=0;ibin<NBin; ibin++) mpi_buffer_d[2*NBin+ibin] = averagepool[iwin].Vittm[ibin];
          for(int ibin=0;ibin<NBin; ibin++) mpi_buffer_d[3*NBin+ibin] = averagepool[iwin].Sfixed[ibin];
          for(int ibin=0;ibin<NBin; ibin++) mpi_buffer_d[4*NBin+ibin] = averagepool[iwin].h[ibin];
-         MPI_Bcast(&(mpi_buffer_d[0]),buff_size,MPI_DOUBLE,root,MPI_COMM_WORLD);
+         if(mp_window.pool.in()) MPI_Bcast(&(mpi_buffer_d[0]),buff_size,MPI_DOUBLE,root,mp_window.pool.comm);
          for(int ibin=0;ibin<NBin; ibin++) averagepool[iwin].S[ibin]      = mpi_buffer_d[0*NBin+ibin];
          for(int ibin=0;ibin<NBin; ibin++) averagepool[iwin].Sittm[ibin]  = mpi_buffer_d[1*NBin+ibin];
          for(int ibin=0;ibin<NBin; ibin++) averagepool[iwin].Vittm[ibin]  = mpi_buffer_d[2*NBin+ibin];
@@ -871,10 +871,11 @@ double MC_WangLandau::DoAnalyzeMPI(std::vector<WLWalker>& walkerpool, WLWalker& 
          for(int ibin=0;ibin<NBin; ibin++) averagepool[iwin].h[ibin]      = mpi_buffer_d[4*NBin+ibin];
       }
       double WLQ = WLQ_max;
-      MPI_Allreduce(&WLQ,&WLQ_max,1,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
+      if(mp_window.pool.in()) MPI_Allreduce(&WLQ,&WLQ_max,1,MPI_DOUBLE,MPI_MAX,mp_window.pool.comm);
    }
 #  endif
    global_walker.sigma = walkerpool[0].sigma;  // Set NSite
+   global_walker.now.V = walkerpool[0].now.V;
    CombinedDOS(averagepool,global_walker);
    ITTM global_ittm;
    ittm.get_global(global_ittm);
@@ -934,8 +935,6 @@ void MC_WangLandau::CombinedDOS(const std::vector<Walker>& walkerpool, Walker& c
    combined.window.set_delta(Elo,Ehi,-1,Ebin); 
    int NBinC = combined.window.NBin;
    combined.S.resize(NBinC);
-// combined.Sittm.resize(NBinC);
-// combined.Vittm.resize(NBinC);
    combined.Sfixed.resize(NBinC);
    combined.h.resize(NBinC);
    int NWin = walkerpool.size();
@@ -951,7 +950,6 @@ void MC_WangLandau::CombinedDOS(const std::vector<Walker>& walkerpool, Walker& c
       int NBinW = walkerpool[iwin].window.NBin;
       int istart = combined.window.bin(Ewin[2*iwin+0]);
       double offS = 0;
-//    double offSittm = 0;
       int imatch = 0;
       // find match point
       if( iwin>0 )
@@ -959,8 +957,6 @@ void MC_WangLandau::CombinedDOS(const std::vector<Walker>& walkerpool, Walker& c
          int NGuard = static_cast<double>(NBinW)*fwinover/10.;
          imatch = NGuard;
          int imatch_max = ifar - istart - 1;
-         //double slope_lo = combined.Sittm[istart+imatch+1] - combined.Sittm[istart+imatch];
-         //double slope_hi = walkerpool[iwin].Sittm[imatch+1] - walkerpool[iwin].Sittm[imatch];
          double slope_lo = combined.S[istart+imatch+1] - combined.S[istart+imatch];
          double slope_hi = walkerpool[iwin].S[imatch+1] - walkerpool[iwin].S[imatch];
          bool foo = !(slope_hi>slope_lo);
@@ -971,14 +967,11 @@ void MC_WangLandau::CombinedDOS(const std::vector<Walker>& walkerpool, Walker& c
             imatch++;
          }
          offS = combined.S[istart+imatch] - walkerpool[iwin].S[imatch];
-         //offSittm = combined.Sittm[istart+imatch] - walkerpool[iwin].Sittm[imatch];
       }
       for(int ibin=imatch; ibin<NBinW; ibin++)
       {
          int ibinc = istart + ibin;
          combined.S[ibinc]      = walkerpool[iwin].S[ibin] + offS;
-//       combined.Sittm[ibinc]  = walkerpool[iwin].Sittm[ibin] + offSittm;
-//       combined.Vittm[ibinc]  = walkerpool[iwin].Vittm[ibin];
          combined.Sfixed[ibinc] = walkerpool[iwin].Sfixed[ibin];
          combined.h[ibinc]      = walkerpool[iwin].h[ibin];
       }
@@ -986,8 +979,6 @@ void MC_WangLandau::CombinedDOS(const std::vector<Walker>& walkerpool, Walker& c
    }
    double mval = *(std::max_element(combined.S.begin(),combined.S.end()));
    for(int ibin=0; ibin<NBinC; ibin++) combined.S[ibin] -= mval;
-// mval = *(std::max_element(combined.Sittm.begin(),combined.Sittm.end()));
-// for(int ibin=0; ibin<NBinC; ibin++) combined.Sittm[ibin] -= mval;
    mval = *(std::max_element(combined.Sfixed.begin(),combined.Sfixed.end()));
    for(int ibin=0; ibin<NBinC; ibin++) combined.Sfixed[ibin] -= mval;
 }
@@ -1010,9 +1001,10 @@ void MC_WangLandau::positive_temps(std::vector<double>& energy, std::vector<doub
 // Equal width windows
 void MC_WangLandau::partition_windows()
 {
-   int iproc=0;
-   MPI_Comm_rank(MPI_COMM_WORLD,&iproc);
-   if(iproc==0) std::cout << __FILE__ << ":" << __LINE__ <<  "(" << iproc << ") Global Window = [" << Elo << "," << Ehi << "] Ebin=" << Ebin << std::endl;
+   if( !mp_window.pool.in() ) return;
+   int iproc= mp_window.pool.iproc;
+   if( iproc==0 ) 
+      std::cout << __FILE__ << ":" << __LINE__ <<  "(" << iproc << ") Global Window = [" << Elo << "," << Ehi << "] Ebin=" << Ebin << std::endl;
    if(Elo>Ehi) std::swap(Elo,Ehi);
    float deltawin = (Ehi-Elo)/(static_cast<float>(NWindow)*(1-fwinover)+fwinover);
    int nbin = static_cast<int>( (deltawin/Ebin) + 0.9 );
@@ -1109,7 +1101,7 @@ void MC_WangLandau::init_pool(std::vector<Walker>& walkerpool)
    mp_window.init(NWindow);
    re_iter = 0;
    // Build walker information
-   if( mp_window.nproc_pool==1 )
+   if( mp_window.pool.nproc==1 )
    {
       // serial
       if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " Serial Window allocation" << std::endl;
@@ -1140,22 +1132,22 @@ void MC_WangLandau::init_pool(std::vector<Walker>& walkerpool)
    {
       if( (Elo==+std::numeric_limits<double>::max()) || (Ehi==-std::numeric_limits<double>::max()) )
       {
-         if(mp_window.iproc_pool==0) std::cout << __FILE__ << ":" << __LINE__ << " Must set Elo and Ehi" << std::endl;
+         if(mp_window.pool.iproc==0) std::cout << __FILE__ << ":" << __LINE__ << " Must set Elo and Ehi" << std::endl;
          return;
       }
       if(Elo==Ehi)
       {
-         if(mp_window.iproc_pool==0) std::cout << __FILE__ << ":" << __LINE__ << " Elo==Ehi" << std::endl;
+         if(mp_window.pool.iproc==0) std::cout << __FILE__ << ":" << __LINE__ << " Elo==Ehi" << std::endl;
          return;
       }
-      if(verbose && mp_window.iproc_pool==0) std::cout << __FILE__ << ":" << __LINE__ << " Global Window = [" << Elo << "," << Ehi << "]" << std::endl;
+      if(verbose && mp_window.pool.iproc==0) std::cout << __FILE__ << ":" << __LINE__ << " Global Window = [" << Elo << "," << Ehi << "]" << std::endl;
       partition_windows();
    }
-   if(false) std::cout << __FILE__ << ":" << __LINE__ << "(" << mp_window.iproc_pool << ")" << std::endl;
-   ittm.mp = mp_window;
+   if(false) std::cout << __FILE__ << ":" << __LINE__ << "(" << mp_window.pool.iproc << ")" << std::endl;
+   ittm.mp = mp_window.pool;
    ittm.init(Elo,Ehi,Ebin);
-   if(false) std::cout << __FILE__ << ":" << __LINE__ << "(" << mp_window.iproc_pool << ")" << std::endl;
-   if( mp_window.nproc_pool==1 )
+   if(false) std::cout << __FILE__ << ":" << __LINE__ << "(" << mp_window.pool.iproc << ")" << std::endl;
+   if( mp_window.pool.nproc==1 )
    {
       // Serial
       const int NWindow_Local = beginwin.size()-1;
@@ -1192,11 +1184,11 @@ void MC_WangLandau::init_pool(std::vector<Walker>& walkerpool)
          walkerpool[iwalk].WEmax = walkerpool[iwalk].window.Ehi; // Ewin[2*iwin+1];
          walkerpool[iwalk].clear_histogram();
          walkerpool[iwalk].clear_entropy();
-         walkerpool[iwalk].iwalk_global = NWalker*(mp_window.iproc_pool)+iwalk;
+         walkerpool[iwalk].iwalk_global = NWalker*(mp_window.pool.iproc)+iwalk;
       }
-      if(mp_window.iproc_gang==0)
+      if(mp_window.gang.iproc==0)
       {
-         std::cout << __FILE__ << ":" << __LINE__ << " iproc=" << mp_window.iproc_pool << " iwalk=" << walkerpool[0].iwalk_global << " " << walkerpool[0].window.Elo << "," << walkerpool[0].window.Ehi << " bin=" << walkerpool[0].window.Ebin << "/" << walkerpool[0].window.NBin << " iwin=" << walkerpool[0].window.iwindow << " WE=" << walkerpool[0].WEmin << "," << walkerpool[0].WEmax << std::endl;
+         std::cout << __FILE__ << ":" << __LINE__ << " iproc=" << mp_window.pool.iproc << " iwalk=" << walkerpool[0].iwalk_global << " " << walkerpool[0].window.Elo << "," << walkerpool[0].window.Ehi << " bin=" << walkerpool[0].window.Ebin << "/" << walkerpool[0].window.NBin << " iwin=" << walkerpool[0].window.iwindow << " WE=" << walkerpool[0].WEmin << "," << walkerpool[0].WEmax << std::endl;
       }
    } 
    for(int iwalk=0; iwalk<NWalker; iwalk++)
@@ -1211,7 +1203,7 @@ template<typename Model, typename Walker>
 void MC_WangLandau::DoReplicaExchange_serial(Model& model, std::vector<Walker>& walkerpool)
 {
    bool verbose = false;
-   if( mp_window.nproc_pool!=1 )
+   if( mp_window.pool.nproc!=1 )
    {
       std::cout << __FILE__ << ":" << __LINE__ << " Serial implentation called in parallel environment" << std::endl;
       return;
@@ -1289,20 +1281,21 @@ void MC_WangLandau::DoReplicaExchange(Model& model, std::vector<Walker>& walkerp
    DoReplicaExchange_serial(model,walkerpool);
    return;
 #  else
+   if(!mp_window.pool.in()) return;
    int nwalk = walkerpool.size();
    if(nwalk<1) return;
    int nspin = walkerpool[0].sigma.size();
-   if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " iproc=" << mp_window.iproc_pool << std::endl;
+   if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " iproc=" << mp_window.pool.iproc << std::endl;
    // alternate between communication to left and right 
    bool send_right = re_iter % 2;                     // 0,1,0,1,0,1,0,1,0,1,0,1,...
    bool when_right = (mp_window.igang+1) % 2;
    // offset in communication pattern
-   int npergang = mp_window.nproc_gang;
+   int npergang = mp_window.gang.nproc;
    int comm_shift = (re_iter/2) % npergang;
    // The actual communication
    MPI_Status status;
-   int jproc_gang = mp_window.nproc_gang;
-   int jproc_pool = mp_window.nproc_pool;
+   int jproc_gang = mp_window.gang.nproc;
+   int jproc_pool = mp_window.pool.nproc;
    MPI_Datatype MPIConfigType = MPITypeTraits<typename Walker::ConfigType::value_type>::mpitype;
    int twonwalk = 2*nwalk;
    double dbuffer[4*nwalk];                           // (E_left,E_right,lng_right,lng_left/lng_right)
@@ -1318,19 +1311,19 @@ void MC_WangLandau::DoReplicaExchange(Model& model, std::vector<Walker>& walkerp
       if( mp_window.igang<(NWindow-1) )
       {
          // look for jproc to right on the number line        
-         jproc_gang = (mp_window.iproc_gang + comm_shift) % npergang;
+         jproc_gang = (mp_window.gang.iproc + comm_shift) % npergang;
          jproc_pool = npergang*(mp_window.igang+1) + jproc_gang;
       }
-      if( 0<=jproc_pool && jproc_pool<mp_window.nproc_pool )
+      if( 0<=jproc_pool && jproc_pool<mp_window.pool.nproc )
       {  
-         if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " RE Left iproc=" << mp_window.iproc_pool << " jproc=" << jproc_pool << std::endl;
+         if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " RE Left iproc=" << mp_window.pool.iproc << " jproc=" << jproc_pool << std::endl;
          // STEP 1: Swap E_left and (E_right,lng_right)
          for(int iwalk=0; iwalk<nwalk; iwalk++)
             E_left[iwalk] = walkerpool[iwalk].now.E;
-         MPI_Send(E_left,nwalk,MPI_DOUBLE,jproc_pool,0,mp_window.comm_pool);
-         MPI_Recv(E_right,twonwalk,MPI_DOUBLE,jproc_pool,1,mp_window.comm_pool,&status);
+         MPI_Send(E_left,nwalk,MPI_DOUBLE,jproc_pool,0,mp_window.pool.comm);
+         MPI_Recv(E_right,twonwalk,MPI_DOUBLE,jproc_pool,1,mp_window.pool.comm,&status);
          // STEP 2: Return lng_left/lng_right
-         MPI_Recv(lng_ratio,nwalk,MPI_DOUBLE,jproc_pool,2,mp_window.comm_pool,&status);
+         MPI_Recv(lng_ratio,nwalk,MPI_DOUBLE,jproc_pool,2,mp_window.pool.comm,&status);
          // STEP 3: Send Accept
          // Thomas Vogel, Ying Wai Li, Thomas Wust, and David P. Landau
          // Generic, Hierarchical Framework for Massively Parallel Wang-Landau Sampling
@@ -1351,20 +1344,20 @@ void MC_WangLandau::DoReplicaExchange(Model& model, std::vector<Walker>& walkerp
             if( Pacc>0 ) Pacc = 0;                                       // Pacc = min[ ln(1), ln(ratio_R*ratio_L) ]
             accept[iwalk] = static_cast<int>( urng()<std::exp(Pacc) );   // convert probability into an action
          }
-         MPI_Send(accept,nwalk,MPI_INT,jproc_pool,3,mp_window.comm_pool);
+         MPI_Send(accept,nwalk,MPI_INT,jproc_pool,3,mp_window.pool.comm);
          // STEP 4: If Accept then swap configuration
          for(int iwalk=0; iwalk<nwalk; iwalk++)
          {
             if( accept[iwalk] )
             {
-               if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " iproc=" << mp_window.iproc_pool << " swapping " << iwalk << " with jproc=" << jproc_pool << std::endl;
-               MPI_Send(&(walkerpool[iwalk].sigma[0]),nspin,MPIConfigType,jproc_pool,iwalk+10000,mp_window.comm_pool);
-               MPI_Recv(&(walkerpool[iwalk].sigma[0]),nspin,MPIConfigType,jproc_pool,iwalk+20000,mp_window.comm_pool,&status);
+               if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " iproc=" << mp_window.pool.iproc << " swapping " << iwalk << " with jproc=" << jproc_pool << std::endl;
+               MPI_Send(&(walkerpool[iwalk].sigma[0]),nspin,MPIConfigType,jproc_pool,iwalk+10000,mp_window.pool.comm);
+               MPI_Recv(&(walkerpool[iwalk].sigma[0]),nspin,MPIConfigType,jproc_pool,iwalk+20000,mp_window.pool.comm,&status);
                model.calc_observable(walkerpool[iwalk].sigma,walkerpool[iwalk].now);
-               if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " iproc=" << mp_window.iproc_pool << " processed " << iwalk << std::endl;
+               if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " iproc=" << mp_window.pool.iproc << " processed " << iwalk << std::endl;
             }
          }
-         if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " iproc=" << mp_window.iproc_pool << std::endl;
+         if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " iproc=" << mp_window.pool.iproc << std::endl;
       }
    }
    else
@@ -1373,44 +1366,44 @@ void MC_WangLandau::DoReplicaExchange(Model& model, std::vector<Walker>& walkerp
       if( mp_window.igang>0 )
       {
          // look for jproc to left on the number line
-         jproc_gang = (mp_window.iproc_gang + (npergang-comm_shift)) % npergang;
+         jproc_gang = (mp_window.gang.iproc + (npergang-comm_shift)) % npergang;
          jproc_pool = npergang*(mp_window.igang-1) + jproc_gang;
       }
-      if( 0<=jproc_pool && jproc_pool<mp_window.nproc_pool )
+      if( 0<=jproc_pool && jproc_pool<mp_window.pool.nproc )
       {  
-         if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " RE Right iproc=" << mp_window.iproc_pool << " jproc=" << jproc_pool << std::endl;
+         if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " RE Right iproc=" << mp_window.pool.iproc << " jproc=" << jproc_pool << std::endl;
          // STEP 1: Swap E_left and (E_right,lng_right)
          for(int iwalk=0; iwalk<nwalk; iwalk++)
          {
             E_right[iwalk]   = walkerpool[iwalk].now.E;
             lng_right[iwalk] = walkerpool[iwalk].get_lndos(E_right[iwalk],LinearInterp);
          }
-         MPI_Recv(E_left,nwalk,MPI_DOUBLE,jproc_pool,0,mp_window.comm_pool,&status);
-         MPI_Send(E_right,twonwalk,MPI_DOUBLE,jproc_pool,1,mp_window.comm_pool);
+         MPI_Recv(E_left,nwalk,MPI_DOUBLE,jproc_pool,0,mp_window.pool.comm,&status);
+         MPI_Send(E_right,twonwalk,MPI_DOUBLE,jproc_pool,1,mp_window.pool.comm);
          // STEP 2: Return lng_left/lng_right
          for(int iwalk=0; iwalk<nwalk; iwalk++)
          {
             lng_ratio[iwalk] = walkerpool[iwalk].get_lndos(E_left[iwalk],LinearInterp) - lng_right[iwalk];
          }
-         MPI_Send(lng_ratio,nwalk,MPI_DOUBLE,jproc_pool,2,mp_window.comm_pool);
+         MPI_Send(lng_ratio,nwalk,MPI_DOUBLE,jproc_pool,2,mp_window.pool.comm);
          // STEP 3: Send Accept
-         MPI_Recv(accept,nwalk,MPI_INT,jproc_pool,3,mp_window.comm_pool,&status);
+         MPI_Recv(accept,nwalk,MPI_INT,jproc_pool,3,mp_window.pool.comm,&status);
          // STEP 4: If Accept then swap configuration
          for(int iwalk=0; iwalk<nwalk; iwalk++)
          {
             if( accept[iwalk] )
             {
-               if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " iproc=" << mp_window.iproc_pool << " swapping " << iwalk << " with jproc=" << jproc_pool << std::endl;
+               if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " iproc=" << mp_window.pool.iproc << " swapping " << iwalk << " with jproc=" << jproc_pool << std::endl;
                typename Walker::ConfigType config_temp(walkerpool[iwalk].sigma.size());
                //typename Walker::ConfigType config_temp = walkerpool[iwalk].sigma;
-               MPI_Recv(&(config_temp[0]),nspin,MPIConfigType,jproc_pool,iwalk+10000,mp_window.comm_pool,&status);
-               MPI_Send(&(walkerpool[iwalk].sigma[0]),nspin,MPIConfigType,jproc_pool,iwalk+20000,mp_window.comm_pool);
+               MPI_Recv(&(config_temp[0]),nspin,MPIConfigType,jproc_pool,iwalk+10000,mp_window.pool.comm,&status);
+               MPI_Send(&(walkerpool[iwalk].sigma[0]),nspin,MPIConfigType,jproc_pool,iwalk+20000,mp_window.pool.comm);
                walkerpool[iwalk].sigma = config_temp;
                model.calc_observable(walkerpool[iwalk].sigma,walkerpool[iwalk].now);
-               if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " iproc=" << mp_window.iproc_pool << " processed " << iwalk << std::endl;
+               if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " iproc=" << mp_window.pool.iproc << " processed " << iwalk << std::endl;
             }
          }
-         if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " iproc=" << mp_window.iproc_pool << std::endl;
+         if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " iproc=" << mp_window.pool.iproc << std::endl;
       }
    }
    // increment the iteration counter

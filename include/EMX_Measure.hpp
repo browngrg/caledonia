@@ -5,7 +5,7 @@
 #include<string>
 #include<stdio.h>
 #include<vector>
-#include"MPI_Gang.hpp"
+#include"MPI_Struct.hpp"
 #include"StatRec.hpp"
 
 
@@ -13,11 +13,11 @@ class EMX_Measure
 {
 public:
 
-   int    icall;         // number of calls
-   bool   written;       // write since last sample?
+   int         icall;    // number of calls
+   bool        written;  // write since last sample?
    std::string header;   // Canned header information from other objects
    std::string filename;
-   MPI_Gang    mp_window;
+   MPI_Struct  mp;       // MPI Information
  
    float Elo,Ehi,Ebin;
    float Mlo,Mhi,Mbin;
@@ -136,11 +136,11 @@ void EMX_Measure::write()
    int nbuff = statbuff.size();
    std::vector<double> stat_global(nbuff,0);
 #  ifdef USE_MPI
-   MPI_Allreduce(&(statbuff[0]),&(stat_global[0]),nbuff,MPI_DOUBLE,MPI_SUM,mp_window.comm_pool);
+   if(mp.in()) MPI_Allreduce(&(statbuff[0]),&(stat_global[0]),nbuff,MPI_DOUBLE,MPI_SUM,mp.comm);
 #  else
    em_global = em_map;
 #  endif
-   if( mp_window.iproc_gang==0 )
+   if( mp.iproc==0 )
    {
       double *emom,*mmom,*xmom,*mMagmom,*xMagmom;
       emom = &(stat_global[0*MAXK*NBinE]);
@@ -189,16 +189,16 @@ void EMX_Measure::write()
    {
       std::vector<long long> em_global(em_map.size());
 #     ifdef USE_MPI
-      if( mp_window.nproc_pool>1 )
+      if( mp.nproc>1 )
       {
          int NBuff = em_map.size();
-         MPI_Allreduce(&(em_map[0]),&(em_global[0]),NBuff,MPI_LONG_LONG,MPI_SUM,mp_window.comm_pool);
+         if(mp.in()) MPI_Allreduce(&(em_map[0]),&(em_global[0]),NBuff,MPI_LONG_LONG,MPI_SUM,mp.comm);
       }
       else
          em_global = em_map;
 #     endif
       //
-      if( mp_window.iproc_pool==0 )
+      if( mp.iproc==0 )
       {
          std::ofstream fout("EMMap.csv");
          fout << "# EM Counts" << std::endl;

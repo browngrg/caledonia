@@ -92,6 +92,7 @@ void DoIt(int& argc, char* argv[])
    if( hamilton.H<0 || prepare_metastable )
       for(int ispin=0; ispin<walkerpool[0].sigma.size(); ispin++) walkerpool[0].sigma[ispin] *= -1;
    hamilton.calc_observable(walkerpool[0].sigma,walkerpool[0].now);
+   simulator.mp = MPI_Struct::world();
    simulator.InitPool(walkerpool);
    // Flip the configuration of half the walks so evenly sample +/-FM configurations (for low fields)
    if( walkerpool.size()>1 && std::fabs(hamilton.H)<0.1 )
@@ -120,7 +121,7 @@ void DoIt(int& argc, char* argv[])
    EMX_Measure measure_obj;
    measure_obj.add_header( hamilton.header() ); 
    measure_obj.add_header( simulator.header() ); 
-   measure_obj.mp_window = simulator.mp_window;
+   measure_obj.mp = simulator.mp;
    measure_obj.init(Emin,Emax,Ebin);
    // Do the simulation
    simulator.DoSample(hamilton,walkerpool,measure_obj); 

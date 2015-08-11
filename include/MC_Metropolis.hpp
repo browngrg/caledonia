@@ -3,7 +3,7 @@
 
 
 #include "Random.hpp"
-#include "MPI_Gang.hpp"
+#include "MPI_Struct.hpp"
 #include "MPITypeTraits.hpp"
 
 #include <vector>
@@ -31,7 +31,7 @@ public:
    long NExchg;                // Number of mesurements blocks between replica exchange attempts
    long re_iter;               // Loop control variable for replica exchange
 
-   MPI_Gang mp_window;         // Multiprocessor information
+   MPI_Struct mp;              // Multiprocessor information
 
    int NWindow;
    int NWalkPerProcess;
@@ -169,13 +169,17 @@ template<typename MCWalker>
 void MC_Metropolis::InitPool(std::vector<MCWalker>& walkerpool)
 {
    if(this->NWalkPerProcess<1) this->NWalkPerProcess=1;
-   mp_window.init(NWindow);
+   //mp.init(NWindow);
+#  ifdef USE_MPI
+   if( mp.in() ) MPI_Comm_rank(mp.comm,&mp.iproc);
+   if( mp.in() ) MPI_Comm_size(mp.comm,&mp.nproc);
+#  endif
    walkerpool.resize(this->NWalkPerProcess);
    for(int iwalk=1; iwalk<walkerpool.size(); iwalk++)
       walkerpool[iwalk]=walkerpool[0];
    for(int iwalk=0; iwalk<walkerpool.size(); iwalk++)
    {
-      walkerpool[iwalk].iwalk_global = NWalkPerProcess*mp_window.iproc_pool+iwalk;
+      walkerpool[iwalk].iwalk_global = NWalkPerProcess*mp.iproc+iwalk;
    }
    // Assign temperatures in a zig-zag pattern over range
    std::vector<float> new_kTlist;
@@ -195,12 +199,12 @@ void MC_Metropolis::InitPool(std::vector<MCWalker>& walkerpool)
          }
       }
       this->Adjust_kT = false;
-      if( mp_window.iproc_pool==0 ) std::cout << "Read " << new_kTlist.size() << " temperatures from input" << std::endl;
+      if( mp.iproc==0 ) std::cout << "Read " << new_kTlist.size() << " temperatures from input" << std::endl;
    }
    if( new_kTlist.size()==0 )
    {
       // Default is evenly spaced temperatures
-      int kTnum = NWalkPerProcess*mp_window.nproc_pool;
+      int kTnum = NWalkPerProcess*mp.nproc;
       float dTemp = 0;
       if(kTnum>1) { dTemp = (kTmax-kTmin)/static_cast<float>(kTnum-1); }
       new_kTlist.resize(kTnum);
@@ -210,7 +214,7 @@ void MC_Metropolis::InitPool(std::vector<MCWalker>& walkerpool)
    this->set_kT(new_kTlist,walkerpool);
    if(false)
    {
-      std::ostringstream iproc_str; iproc_str << mp_window.iproc_pool;
+      std::ostringstream iproc_str; iproc_str << mp.iproc;
       std::string filename = "MC_MetropTemps_" + iproc_str.str() + ".csv";
       std::ofstream fout(filename.c_str());
       for(int i=0; i<walkerpool.size(); i++)
@@ -224,9 +228,9 @@ void MC_Metropolis::set_kT(const std::vector<float>& new_kT, std::vector<Walker>
 {
    this->kTlist = new_kT;
    int kTnum = kTlist.size();
-   int kTmax = NWalkPerProcess*mp_window.nproc_pool;                 // limited by number of walkers
+   int kTmax = NWalkPerProcess*mp.nproc;                 // limited by number of walkers
    if( kTnum>kTmax ) { kTlist.resize(kTmax); kTnum=kTlist.size(); }
-   int ii = (NWalkPerProcess*mp_window.iproc_pool)%(2*kTnum);
+   int ii = (NWalkPerProcess*mp.iproc)%(2*kTnum);
    bool up = true;
    if( ii>=kTnum ) 
    {
@@ -274,7 +278,7 @@ void MC_Metropolis::CalcOptimal_kT(std::vector<MCWalker>& walker, bool DoAdjust)
          emom_buff[kTi+k] += walker[iwalk].emom[k];
    }
    std::vector<double> emom_global(buff_size);
-   MPI_Allreduce(&(emom_buff[0]),&(emom_global[0]),buff_size,MPI_DOUBLE,MPI_SUM,mp_window.comm_pool);
+   MPI_Allreduce(&(emom_buff[0]),&(emom_global[0]),buff_size,MPI_DOUBLE,MPI_SUM,mp.comm);
    // Adjust temperatures
    bool bad = false;
    std::vector<float> mean(kTnum);
@@ -343,7 +347,7 @@ void MC_Metropolis::CalcOptimal_kT(std::vector<MCWalker>& walker, bool DoAdjust)
          sigi = sigj;
       }
    } 
-   if( mp_window.iproc_pool==0 )
+   if( mp.iproc==0 )
    {
       std::ofstream fout("MC_MetropOptimal.csv");
       fout << "# Optimal temperatures for MC_Metropolis" << std::endl;
@@ -365,7 +369,7 @@ template<typename Hamilton, typename MCWalker>
 void MC_Metropolis::read_config(Hamilton& hamilton, std::vector<MCWalker>& walker)
 {
    char cfilename[100];
-   sprintf(cfilename,"MC_MetropConfig_%d",mp_window.iproc_pool);
+   sprintf(cfilename,"MC_MetropConfig_%d",mp.iproc);
    std::ifstream fin(cfilename);
    if( fin && fin.is_open() )
    {
@@ -385,8 +389,8 @@ void MC_Metropolis::write(const std::vector<MCWalker>& walker)
 {
    // write configs
    char cfilename[100];
-   sprintf(cfilename,"MC_MetropConfig_%d",mp_window.iproc_pool);
-   if( mp_window.iproc_pool<100 )
+   sprintf(cfilename,"MC_MetropConfig_%d",mp.iproc);
+   if( mp.iproc<100 )
    {
       std::ofstream fout(cfilename);
       if( fout && fout.is_open() )
@@ -413,16 +417,16 @@ void MC_Metropolis::write(const std::vector<MCWalker>& walker)
          emom_buff[kTi+k] += walker[iwalk].emom[k];
    }
    std::vector<double> emom_global(buff_size);
-   MPI_Allreduce(&(emom_buff[0]),&(emom_global[0]),buff_size,MPI_DOUBLE,MPI_SUM,mp_window.comm_pool);
+   MPI_Allreduce(&(emom_buff[0]),&(emom_global[0]),buff_size,MPI_DOUBLE,MPI_SUM,mp.comm);
    std::vector<long> re_buff(kTnum,0);
    for(int iwalk=0; iwalk<walker.size(); iwalk++)
    {
       re_buff[ walker[iwalk].kTi ] += walker[iwalk].re_swap;
    }
    std::vector<long> re_swap(kTnum);
-   MPI_Allreduce(&(re_buff[0]),&(re_swap[0]),kTnum,MPI_LONG,MPI_SUM,mp_window.comm_pool);
+   MPI_Allreduce(&(re_buff[0]),&(re_swap[0]),kTnum,MPI_LONG,MPI_SUM,mp.comm);
    // Root process writes
-   if( mp_window.iproc_pool==0 )
+   if( mp.iproc==0 )
    {
       std::ofstream fout(filename.c_str());
       fout << "# Basic Energy statistics for walkers" << std::endl;
@@ -478,8 +482,9 @@ void MC_Metropolis::DoReplicaExchange(Model& model, std::vector<Walker>& walkerp
 {
    bool send_right = re_iter % 2;
 #  ifdef USE_MPI
-   const int iproc = mp_window.iproc_pool;
-   const int nproc = mp_window.nproc_pool;
+   if( !mp.in() ) return;
+   const int iproc = mp.iproc;
+   const int nproc = mp.nproc;
    if( nproc>1 )
    {
       const int irght = (iproc+1)%nproc;
@@ -492,8 +497,8 @@ void MC_Metropolis::DoReplicaExchange(Model& model, std::vector<Walker>& walkerp
       std::vector<double> right(2),left(2);
       right[0] = walkerpool[jwalk].now.E; 
       right[1] = walkerpool[jwalk].kT; 
-      MPI_Send(&(right[0]),2,MPI_DOUBLE,irght,tag,mp_window.comm_pool);
-      MPI_Recv(&(left[0]), 2,MPI_DOUBLE,ileft,tag,mp_window.comm_pool,&status);   
+      MPI_Send(&(right[0]),2,MPI_DOUBLE,irght,tag,mp.comm);
+      MPI_Recv(&(left[0]), 2,MPI_DOUBLE,ileft,tag,mp.comm,&status);   
       double E_left = left[0];
       double kT_left = left[1];
       // Decide accept/reject
@@ -507,8 +512,8 @@ void MC_Metropolis::DoReplicaExchange(Model& model, std::vector<Walker>& walkerp
             accept_left = (urng()<exp(delta));
       }
       bool accept_right;
-      MPI_Send(&accept_left, 1,MPI_C_BOOL,ileft,tag+1000,mp_window.comm_pool);
-      MPI_Recv(&accept_right,1,MPI_C_BOOL,irght,tag+1000,mp_window.comm_pool,&status);
+      MPI_Send(&accept_left, 1,MPI_C_BOOL,ileft,tag+1000,mp.comm);
+      MPI_Recv(&accept_right,1,MPI_C_BOOL,irght,tag+1000,mp.comm,&status);
       // Swap configurations (pattern borrowed from MC_WangLandau.hpp
       int NSPIN = walkerpool[0].sigma.size();
       MPI_Datatype MPIConfigType = MPITypeTraits<typename Walker::ConfigType::value_type>::mpitype;
@@ -517,16 +522,16 @@ void MC_Metropolis::DoReplicaExchange(Model& model, std::vector<Walker>& walkerp
       {
          if( accept_right )
          {
-            MPI_Send(&(walkerpool[jwalk].sigma[0]),NSPIN,MPIConfigType,irght,tag+3000,mp_window.comm_pool);
-            MPI_Recv(&(buffer[0]),NSPIN,MPIConfigType,irght,tag+2000,mp_window.comm_pool,&status);
+            MPI_Send(&(walkerpool[jwalk].sigma[0]),NSPIN,MPIConfigType,irght,tag+3000,mp.comm);
+            MPI_Recv(&(buffer[0]),NSPIN,MPIConfigType,irght,tag+2000,mp.comm,&status);
             walkerpool[jwalk].re_swap++;
             walkerpool[jwalk].sigma = buffer;
             model.calc_observable(walkerpool[jwalk].sigma,walkerpool[jwalk].now);
          }
          if( accept_left )
          {
-            MPI_Recv(&(buffer[0]),NSPIN,MPIConfigType,ileft,tag+3000,mp_window.comm_pool,&status);
-            MPI_Send(&(walkerpool[0].sigma[0]),NSPIN,MPIConfigType,ileft,tag+2000,mp_window.comm_pool);
+            MPI_Recv(&(buffer[0]),NSPIN,MPIConfigType,ileft,tag+3000,mp.comm,&status);
+            MPI_Send(&(walkerpool[0].sigma[0]),NSPIN,MPIConfigType,ileft,tag+2000,mp.comm);
             walkerpool[0].re_swap++;
             walkerpool[0].sigma = buffer;
             model.calc_observable(walkerpool[0].sigma,walkerpool[0].now);
@@ -536,16 +541,16 @@ void MC_Metropolis::DoReplicaExchange(Model& model, std::vector<Walker>& walkerp
       {
          if( accept_left )
          {
-            MPI_Recv(&(buffer[0]),NSPIN,MPIConfigType,ileft,tag+3000,mp_window.comm_pool,&status);
-            MPI_Send(&(walkerpool[0].sigma[0]),NSPIN,MPIConfigType,ileft,tag+2000,mp_window.comm_pool);
+            MPI_Recv(&(buffer[0]),NSPIN,MPIConfigType,ileft,tag+3000,mp.comm,&status);
+            MPI_Send(&(walkerpool[0].sigma[0]),NSPIN,MPIConfigType,ileft,tag+2000,mp.comm);
             walkerpool[0].re_swap++;
             walkerpool[0].sigma = buffer;
             model.calc_observable(walkerpool[0].sigma,walkerpool[0].now);
          }
          if( accept_right )
          {
-            MPI_Send(&(walkerpool[jwalk].sigma[0]),NSPIN,MPIConfigType,irght,tag+3000,mp_window.comm_pool);
-            MPI_Recv(&(buffer[0]),NSPIN,MPIConfigType,irght,tag+2000,mp_window.comm_pool,&status);
+            MPI_Send(&(walkerpool[jwalk].sigma[0]),NSPIN,MPIConfigType,irght,tag+3000,mp.comm);
+            MPI_Recv(&(buffer[0]),NSPIN,MPIConfigType,irght,tag+2000,mp.comm,&status);
             walkerpool[jwalk].re_swap++;
             walkerpool[jwalk].sigma = buffer;
             model.calc_observable(walkerpool[jwalk].sigma,walkerpool[jwalk].now);

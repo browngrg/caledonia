@@ -1,7 +1,7 @@
 #ifndef ITTM_HPP_
 #define ITTM_HPP_
 
-#include "MPI_Gang.hpp"
+#include "MPI_Struct.hpp"
 
 #include<iostream>
 #include<iomanip>
@@ -54,7 +54,7 @@ public:
    std::vector<long long> GrowCts;          // Binned growing and shrinking
    std::vector<long long> ShrkCts;
 
-   MPI_Gang mp;
+   MPI_Struct mp;
 
 public:
 
@@ -141,7 +141,7 @@ void ITTM::init(double Emin, double Emax, double _EBin)
 
 void ITTM::read()
 {
-   if( mp.iproc_pool==0 || C.size()==0 ) return;
+   if( mp.iproc==0 || C.size()==0 ) return;
    std::ifstream fin("ITTM_CBand.csv");
    if( fin && fin.is_open() )
    {
@@ -186,37 +186,33 @@ void ITTM::get_global(ITTM& global) const
    int NBuff = C.size();
    global.C.resize(NBuff);
    for(int i=0; i<NBuff; i++) global.C[i] = 0;
-   MPI_Allreduce(&(C[0]),&(global.C[0]),NBuff,MPI_LONG_LONG,MPI_SUM,mp.comm_pool);
+   if(mp.in()) MPI_Allreduce(&(C[0]),&(global.C[0]),NBuff,MPI_LONG_LONG,MPI_SUM,mp.comm);
    NBuff = Cob.size();
    global.Cob.resize(NBuff);
    for(int i=0; i<NBuff; i++) global.Cob[i] = 0;
-   MPI_Allreduce(&(Cob[0]),&(global.Cob[0]),NBuff,MPI_LONG_LONG,MPI_SUM,mp.comm_pool);
+   if(mp.in()) MPI_Allreduce(&(Cob[0]),&(global.Cob[0]),NBuff,MPI_LONG_LONG,MPI_SUM,mp.comm);
    global.EStepSum = 0;
-   MPI_Allreduce(&(EStepSum),&(global.EStepSum),1,MPI_DOUBLE,MPI_SUM,mp.comm_pool);
+   if(mp.in()) MPI_Allreduce(&(EStepSum),&(global.EStepSum),1,MPI_DOUBLE,MPI_SUM,mp.comm);
    global.EStepCnt = 0;
-   MPI_Allreduce(&(EStepCnt),&(global.EStepCnt),1,MPI_LONG_LONG,MPI_SUM,mp.comm_pool);
+   if(mp.in()) MPI_Allreduce(&(EStepCnt),&(global.EStepCnt),1,MPI_LONG_LONG,MPI_SUM,mp.comm);
    if(PD)
    {
-      // MPICH on linux fails without the print statements
       NBuff = GrowCts.size();
       global.GrowCts.resize(NBuff); for(int i=0; i<NBuff; i++) global.GrowCts[i]=0;
       global.ShrkCts.resize(NBuff); for(int i=0; i<NBuff; i++) global.ShrkCts[i]=0;
-      //std::cout << __FILE__ << ":" << __LINE__ << "(" << mp.iproc_pool << ") NBuff=" << NBuff << std::endl;
-      MPI_Allreduce(&(GrowCts[0]),&(global.GrowCts[0]),NBuff,MPI_LONG_LONG,MPI_SUM,mp.comm_pool);
-      //std::cout << __FILE__ << ":" << __LINE__ << "(" << mp.iproc_pool << ") NBuff=" << NBuff << std::endl;
-      MPI_Allreduce(&(ShrkCts[0]),&(global.ShrkCts[0]),NBuff,MPI_LONG_LONG,MPI_SUM,mp.comm_pool);
-      //std::cout << __FILE__ << ":" << __LINE__ << "(" << mp.iproc_pool << ") NBuff=" << NBuff << std::endl;
+      if(mp.in()) MPI_Allreduce(&(GrowCts[0]),&(global.GrowCts[0]),NBuff,MPI_LONG_LONG,MPI_SUM,mp.comm);
+      if(mp.in()) MPI_Allreduce(&(ShrkCts[0]),&(global.ShrkCts[0]),NBuff,MPI_LONG_LONG,MPI_SUM,mp.comm);
    }
    if( Cfull.size()>0 )
    {
       NBuff = Cfull.size();
       global.Cfull.resize(NBuff);
       for(int i=0; i<NBuff; i++) global.Cfull[i] = 0;
-      MPI_Allreduce(&(Cfull[0]),&(global.Cfull),NBuff,MPI_LONG_LONG,MPI_SUM,mp.comm_pool);
+      if(mp.in()) MPI_Allreduce(&(Cfull[0]),&(global.Cfull),NBuff,MPI_LONG_LONG,MPI_SUM,mp.comm);
       std::vector<long long> blocal(2),bglobal(2);
       blocal[0] = CJlo;
       blocal[1] = CJhi;
-      MPI_Allreduce(&(blocal[0]),&(bglobal[0]),2,MPI_LONG_LONG,MPI_SUM,mp.comm_pool);
+      if(mp.in()) MPI_Allreduce(&(blocal[0]),&(bglobal[0]),2,MPI_LONG_LONG,MPI_SUM,mp.comm);
       global.CJlo = bglobal[0];
       global.CJhi = bglobal[1];
    }
@@ -227,7 +223,7 @@ void ITTM::write() const
 {
    ITTM global;
    this->get_global(global);
-   if( mp.iproc_pool == 0 )
+   if( mp.iproc == 0 )
    {
       std::ofstream fout("ITTM_CBand.csv");
       for(int i=0; i<NBinE; i++)
@@ -238,7 +234,7 @@ void ITTM::write() const
          fout << " " << global.Cob[ i ] << std::endl;
       }
    }
-   if( mp.iproc_pool == 0 )
+   if( mp.iproc == 0 )
    {
       global.calc_SITTM();
       global.calc_VITTM();
@@ -291,7 +287,7 @@ void ITTM::write() const
          fout << std::endl;
       }
    }
-   if( Cfull.size()>0 && mp.iproc_pool == 0 )
+   if( Cfull.size()>0 && mp.iproc == 0 )
    {
       // This branch not debugged. GPB 7/31/2015
       std::ofstream fout("ITTM_CFull.csv");
@@ -719,7 +715,7 @@ void ITTM::calc_SITTM_Rayleigh(std::vector<F>& _SITTM) const
    if( true )
    {
       char buff[500];
-      sprintf(buff,"WalkerDOS-%02d.csv",mp.iproc_pool);
+      sprintf(buff,"WalkerDOS-%02d.csv",mp.iproc);
       std::ofstream fout(buff);
       fout << "# Data from Analysis of Full C Matrix" << std::endl;;
       fout << "# orig nbin = " << nold <<" analyze nbin=" << nbin << std::endl;;
