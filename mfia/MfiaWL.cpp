@@ -50,11 +50,10 @@ void DoIt(int& argc, char* argv[])
 {
 
    //  Get basic MPI information
-   int iproc = 0;
-   int nproc = 1;
+   MPI_Struct world = MPI_Struct::world();
 #  ifdef USE_MPI
-   MPI_Comm_rank(MPI_COMM_WORLD,&iproc);
-   MPI_Comm_size(MPI_COMM_WORLD,&nproc);
+   MPI_Comm_rank(world.comm,&world.iproc);
+   MPI_Comm_size(world.comm,&world.nproc);
 #  endif
 
    using namespace std;
@@ -96,13 +95,12 @@ void DoIt(int& argc, char* argv[])
    // Get parameters
    options.parse_command_line(argc,argv);
    if( options.get_value<bool>("help") ) return;
-   bool verbose = options.get_value<bool>("verbose") && (iproc==0);
+   bool verbose = options.get_value<bool>("verbose") && (world.iproc==0);
 
    // Re-initialize objects
    if(verbose) cout << __FILE__ << ":" << __LINE__ << " Reinitialize begun" << endl;
    hamilton.init(verbose);
    const int NGrid = hamilton.V;
-   std::cout << hamilton.header();
    if(verbose) cout << __FILE__ << ":" << __LINE__ << " NGrid=" << NGrid << endl;
 
    // seed the random number geneator
@@ -154,12 +152,12 @@ void DoIt(int& argc, char* argv[])
       while( i<energy.size() && energy[i]<wanglandau.Elo ) i++;
       if( i<energy.size() )
       { 
-         std::cout << "Elo = " << wanglandau.Elo << std::endl;
-         std::cout << "Triming energy from " << energy.front() << " with " << energy.size() << " elements" << std::endl;
+         if(verbose) std::cout << "Elo = " << wanglandau.Elo << std::endl;
+         if(verbose) std::cout << "Trimming energy from " << energy.front() << " with " << energy.size() << " elements" << std::endl;
          energy.erase(energy.begin(),energy.begin()+i);
          lng_est.erase(lng_est.begin(),lng_est.begin()+i);
          energy[0] = wanglandau.Elo;
-         std::cout << "To energy from " << energy.front() << " with " << energy.size() << " elements" << std::endl;
+         if(verbose) std::cout << "To energy from " << energy.front() << " with " << energy.size() << " elements" << std::endl;
       }
    }
    if( wanglandau.Ehi>-std::numeric_limits<double>::max() )
@@ -168,12 +166,12 @@ void DoIt(int& argc, char* argv[])
       while( i<energy.size() && energy[i]<wanglandau.Ehi ) i++;
       if( i<energy.size() )
       { 
-         std::cout << "Ehi = " << wanglandau.Ehi << std::endl;
-         std::cout << "Triming energy ending at " << energy.back() << " with " << energy.size() << " elements" << std::endl;
+         if(verbose) std::cout << "Ehi = " << wanglandau.Ehi << std::endl;
+         if(verbose) std::cout << "Trimming energy ending at " << energy.back() << " with " << energy.size() << " elements" << std::endl;
          energy.erase(energy.begin()+i,energy.end());
          lng_est.erase(lng_est.begin()+i,lng_est.end());
          energy[i-1] = wanglandau.Ehi;
-         std::cout << "To energy ending at " << energy.back() << " with " << energy.size() << " elements" << std::endl;
+         if(verbose) std::cout << "To energy ending at " << energy.back() << " with " << energy.size() << " elements" << std::endl;
       }
    }
 
@@ -187,13 +185,14 @@ void DoIt(int& argc, char* argv[])
    hamilton.initial_mixed(walkerpool[0].sigma);
    hamilton.calc_observable(walkerpool[0].sigma,walkerpool[0].now);
    wanglandau.verbose = options.get_value<bool>("verbose");
+   wanglandau.mp_window.set_pool(MPI_Struct::world());
    wanglandau.partition_windows(energy,lng_est);
    wanglandau.init_pool(walkerpool);   
    for(int iwalk=0; iwalk<walkerpool.size(); iwalk++)
       walkerpool[iwalk].set_fixed(energy,lng_est);
    //measure_obj.init(walkerpool[0].window.Elo,walkerpool[0].window.Ehi,walkerpool[0].window.Ebin);
    measure_obj.init(wanglandau.Elo,wanglandau.Ehi,wanglandau.Ebin);
-   measure_obj.mp_window = wanglandau.mp_window; 
+   measure_obj.mp = wanglandau.mp_window.pool; 
    wanglandau.DoConverge(hamilton,walkerpool,measure_obj);
    //wanglandau.DoTMConverge(hamilton,walkerpool);
 }

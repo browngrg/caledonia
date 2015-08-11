@@ -171,8 +171,6 @@ Mfia_Hamiltonian::Mfia_Hamiltonian(int DIM, int Lval, bool AFM)
 std::string Mfia_Hamiltonian::header() const
 {
    char buffer[1024];
-   sprintf(buffer,"# Mfia Model J=%d H=%lf A=%lf\n",JSIGN,H,A);
-   sprintf(buffer,"# Dim=%d L=%d N=%d\n",D,L,V);
    return std::string(buffer);
 }
 
@@ -296,6 +294,7 @@ void Mfia_Hamiltonian::change(Mfia_Hamiltonian::Config& sigma, Mfia_Observables&
    macro.E_N = -JSIGN*macro.N;            // JSIGN*macro.N;
    macro.E_H = -H*macro.M;
    macro.E_A = -AhbV*macro.M*macro.M;
+   macro.V   = V;
    // Flip the spin
    S[ispin] = new_sigma;
 }
