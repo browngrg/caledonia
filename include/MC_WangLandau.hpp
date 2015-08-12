@@ -875,7 +875,6 @@ double MC_WangLandau::DoAnalyze(std::vector<WLWalker>& walkerpool, WLWalker& ave
    // Reduce across MPI processes
    if( mp_window.ngang>1 )
    {
-      if(verbose) std::cout << __FILE__ << ":" << __LINE__ << std::endl;
       // Should not reduce h(E) for regular WL, where need to test for flatness before averaging
       std::vector<double> mpi_buffer_d(average.h.size(),0);
       MPI_Allreduce(&(average.h[0]),&(mpi_buffer_d[0]),average.h.size(),MPI_DOUBLE,MPI_SUM,mp_window.gang.comm);
@@ -883,7 +882,6 @@ double MC_WangLandau::DoAnalyze(std::vector<WLWalker>& walkerpool, WLWalker& ave
       mpi_buffer_d.resize(average.S.size(),0);
       MPI_Allreduce(&(average.S[0]),&(mpi_buffer_d[0]),average.S.size(),MPI_DOUBLE,MPI_SUM,mp_window.gang.comm);
       for(int j=0; j<average.S.size(); j++) average.S[j] = mpi_buffer_d[j];
-      if(verbose) std::cout << __FILE__ << ":" << __LINE__ << std::endl;
    }
 #  endif
    double NWT = static_cast<double>(mp_window.gang.nproc*NWalkPerProcess); 
@@ -1084,7 +1082,6 @@ void MC_WangLandau::partition_windows()
    Ehi = std::max(Ehi,Elo+Ebin*nbin);
    deltawin = nbin*Ebin;
    if( nbin<10 ) std::cout << __FILE__ << ":" << __LINE__ << " Too few bins per window. nbin=" << nbin << std::endl;
-   if( nbin>10000 ) std::cout << __FILE__ << ":" << __LINE__ << " Many bins per window. nbin=" << nbin << std::endl;
    Ewin.resize(2*NWindow);
    for(int iwin=0; iwin<NWindow; iwin++)
    {
