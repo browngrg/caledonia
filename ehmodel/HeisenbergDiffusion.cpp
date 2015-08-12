@@ -1,31 +1,10 @@
-// HeisenbergDiffuse.cpp -- WangLandau sampling of the Heisenberg model
+// HeisenbergDiffuse.cpp -- Measure diffusion properties of WangLandau walkers
 //
 // Greg Brown (gbrown@fsu.edu,browngrg@comcast.net)
-//
-// History
-//
-// HiesenbergDiffuse.cpp -- Added Meas_Diffusion object to measure diffusion of walkers.
-// Aug 5, 2015
-//
-// Heisenberg2.cpp -- Changed from WL update to TM update
-// Aug 29, 2014
-//
-// Heisenberg1.cpp -- WangLandau sampling of Heisenberg model
-// Aug 15, 2014
-//
-// Mfia2.cpp -- WangLandau sampling of Mfia model (Borrows heavily from Latgas3.cpp)
-// August 7, 2014
-//
-// Mfia1.cpp -- Generate the Metropolis trajectory of one Mfia Monte Carlo walker
-// June 28, 2014  Copied from Wham3.cpp
-//
-// Wham3.cpp -- Generate the trajectory of one Metropolis Monte Carlo walker
-// June 4, 2014    Refactored for larger MC scheme
-// Greg Brown (gbrown@fsu.edu,browngrg@comcast.net)
-//
 
 #include"MC_WangLandau.hpp"
 #include"WL_Walker.hpp"
+#include"MPI_Struct.hpp"
 #include"Heisenberg_Hamiltonian.hpp"
 #include"Meas_Diffusion.hpp"
 #include"Random.hpp"
@@ -128,7 +107,7 @@ void DoHeisenberg(int& argc, char* argv[])
    options.add_option( "configout","output configurations to disk", ' ', &(wanglandau.output_configs));
 
    Meas_Diffusion measure;
-   options.add_option( "delay",    "target convergence factor",     ' ', &(measure.delay));
+   options.add_option( "diff_delay","delay in measuring diffusion", ' ', &(measure.delay));
 
    // Local options
    char lng_est_fn[512]; lng_est_fn[0]=0;
@@ -166,7 +145,8 @@ void DoHeisenberg(int& argc, char* argv[])
    walkerpool[0].sigma.resize(NGrid);
    hamilton.initial_ferro(walkerpool[0].sigma);
    hamilton.calc_observable(walkerpool[0].sigma,walkerpool[0].now);
-   wanglandau.verbose = options.get_value<bool>("verbose");
+   wanglandau.verbose = verbose;
+   wanglandau.mp_window.pool = MPI_Struct::world();
    wanglandau.partition_windows();
    wanglandau.init_pool(walkerpool);
    std::vector<double> energy;
@@ -179,26 +159,32 @@ void DoHeisenberg(int& argc, char* argv[])
       for(int iwalk=0; iwalk<walkerpool.size(); iwalk++)
          walkerpool[iwalk].set_fixed(energy,est_lng);
    }
+   if(verbose) cout << __FILE__ << ":" << __LINE__ << " Done create one walker" << endl;
 
    measure.init(wanglandau.Elo,wanglandau.Ehi,wanglandau.Ebin);
+   if(verbose) cout << __FILE__ << ":" << __LINE__ << " Measurement object initialized" << endl;
 
    wanglandau.DoConverge(hamilton,walkerpool,measure);
+
+   options.write();
 }
 
 
 
 int main(int argc, char* argv[])
 {
-   if( true )
+
+   int iproc = 0;
+#  ifdef USE_MPI
+   MPI_Init(&argc,&argv);
+   MPI_Comm_rank(MPI_COMM_WORLD,&iproc);
+#  endif
+   if( iproc==0 )
    {
       std::cout << "cmdline:";
       for(int i=0; i<argc; i++) std::cout << " " << argv[i];
       std::cout << std::endl;
    }
-
-#  ifdef USE_MPI
-   MPI_Init(&argc,&argv);
-#  endif
    DoHeisenberg(argc,argv);
 #  ifdef USE_MPI
    MPI_Finalize();
