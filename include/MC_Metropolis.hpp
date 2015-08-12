@@ -5,6 +5,7 @@
 #include "Random.hpp"
 #include "MPI_Struct.hpp"
 #include "MPITypeTraits.hpp"
+#include "ProcessTime.hpp"
 
 #include <vector>
 #include <string>
@@ -36,7 +37,13 @@ public:
    int NWindow;
    int NWalkPerProcess;
 
-   std::string filename;       // For output of energy statistics
+//   std::string filename;       // For output of energy statistics
+
+   ProcessTime ptime;
+   double ckpt_freq;              // How often to write results (in seconds)
+   double ckpt_last;              // When the last ckpt write occurred
+   double wall_limit;             // Longest time to run (in seconds)
+   bool   at_wall_limit;
 
 public:
 
@@ -51,8 +58,12 @@ public:
       this->NWindow = 1;
       this->NWalkPerProcess = 10;
       this->re_iter = 0;
-      this->filename = "";
+//      this->filename = "";
       this->Adjust_kT = true;
+      at_wall_limit = false;
+      wall_limit = 24*60*60;
+      ckpt_freq  = 10*60;
+      ckpt_last  = 0;
    }
 
    ~MC_Metropolis()
@@ -137,7 +148,7 @@ void MC_Metropolis::DoSample(Hamiltonian& hamilton, std::vector<MCWalker>& walke
    }
    long NMeasTot = NMeas + NTherm;
    bool written = true;
-   for(long imeas=0; imeas<NMeasTot; imeas++)
+   for(long imeas=0; imeas<NMeasTot && !at_wall_limit; imeas++)
    {
       for(int iwalk=0; iwalk<walker.size(); iwalk++)
          this->DoNStep(NStep,hamilton,walker[iwalk]);
@@ -148,14 +159,19 @@ void MC_Metropolis::DoSample(Hamiltonian& hamilton, std::vector<MCWalker>& walke
          if( at_equilibrium ) walker[iwalk].sample();
       }
       written = false;
-      if( (imeas%(1000000))==0 && imeas>0 )
+      double ptime_sec = ptime.elapsed();
+      double ckpt_sec = ptime_sec - ckpt_last;
+      if( ckpt_sec>ckpt_freq )
       {
+         ckpt_last = ptime_sec;
          measure_obj.write();
          this->write(walker);
          written = true;
          this->CalcOptimal_kT(walker,false);
       }
       if( (imeas%NExchg)==0 ) DoReplicaExchange(hamilton,walker);
+      double remain_sec = wall_limit - ptime.elapsed();
+      at_wall_limit = (remain_sec<ckpt_freq);
    }
    if( !written )
    {
@@ -168,6 +184,10 @@ void MC_Metropolis::DoSample(Hamiltonian& hamilton, std::vector<MCWalker>& walke
 template<typename MCWalker>
 void MC_Metropolis::InitPool(std::vector<MCWalker>& walkerpool)
 {
+   ptime.mp = mp;
+   ptime.start();
+   ckpt_last = ptime.elapsed();
+   at_wall_limit = false;
    if(this->NWalkPerProcess<1) this->NWalkPerProcess=1;
    //mp.init(NWindow);
 #  ifdef USE_MPI
@@ -405,8 +425,6 @@ void MC_Metropolis::write(const std::vector<MCWalker>& walker)
    }
    // Output Energy moments
    const int MAXK = MCWalker::MAXK;
-   if( filename=="" ) { filename = "MC_Metrop.csv"; }
-   // mpi_gather
    int kTnum = kTlist.size();
    int buff_size = kTnum*MAXK;
    std::vector<double> emom_buff(buff_size,0);
@@ -428,7 +446,7 @@ void MC_Metropolis::write(const std::vector<MCWalker>& walker)
    // Root process writes
    if( mp.iproc==0 )
    {
-      std::ofstream fout(filename.c_str());
+      std::ofstream fout("MC_Metrop.csv");
       fout << "# Basic Energy statistics for walkers" << std::endl;
       fout << header();
       fout << "# Column 1: kT" << std::endl;
