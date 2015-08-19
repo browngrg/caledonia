@@ -34,6 +34,7 @@ public:
     int C;        // Number of up spins (column)
     int U;        // Number of ungerade pairs
     int V;        // Number of spins
+    double H;     // 
     double E_N;
     double E_H;
     double E_A;
@@ -52,6 +53,7 @@ public:
         C = w.C;
         U = w.U;
         V = w.V;
+        H = w.H;
         E_N = w.E_N;
         E_H = w.E_H;
         E_A = w.E_A;
@@ -134,7 +136,11 @@ public:
 
    // Change the value of sigma_i at one grid point, update observables
    void change(Config& sigma, Mfia_Observables& macro, int ispin, short new_sigma);
-    
+  
+   // Change the value of the external field 
+   void change_field(Mfia_Observables& macro, float Hnew);
+   bool use_walker_H;
+
    // Make an attempted Monte Carlo step
    enum { SPINFLIP = true };
    template<typename MCWalker, typename URNG> void mc_step(MCWalker& walker, URNG& urng);
@@ -164,6 +170,7 @@ Mfia_Hamiltonian::Mfia_Hamiltonian(int DIM, int Lval, bool AFM)
    JSIGN = -1;
    if(!AFM) JSIGN = +1;
    A = H = 0;
+   use_walker_H = false;
    this->init();
 }
 
@@ -244,6 +251,7 @@ void Mfia_Hamiltonian::init(bool verbose)
 
 void Mfia_Hamiltonian::calc_observable(Config& sigma, Mfia_Observables& macro)
 {
+   if( !use_walker_H ) macro.H = H;
    short* S(&(sigma[0]));
    int M = 0;
    int N = 0;
@@ -261,17 +269,27 @@ void Mfia_Hamiltonian::calc_observable(Config& sigma, Mfia_Observables& macro)
    macro.C = (V+M)/2;
    macro.U = (D*V-N)/2;
    macro.R = macro.U/2;
-   macro.E = -JSIGN*N-H*M-AhbV*M*M; // JSIGN*N-H*M-AhbV*M*M; 
+   macro.E = -JSIGN*N-macro.H*M-AhbV*M*M; // JSIGN*N-H*M-AhbV*M*M; 
    macro.E_N = -JSIGN*N;            // JSIGN*N;
-   macro.E_H = -H*M;
+   macro.E_H = -macro.H*M;
    macro.E_A = -AhbV*M*M;
    macro.X = P;
    macro.V = V;
 }
 
+  
+void Mfia_Hamiltonian::change_field(Mfia_Observables& macro, float Hnew)
+{
+   use_walker_H = true;
+   macro.E -= macro.E_H;
+   macro.H = Hnew;
+   macro.E_H = -macro.H*macro.M;
+   macro.E += macro.E_H;
+}
 
 void Mfia_Hamiltonian::change(Mfia_Hamiltonian::Config& sigma, Mfia_Observables& macro, int ispin, short new_sigma)
 {
+   if( !use_walker_H ) macro.H = H;
    short* S(&(sigma[0]));
    // calculate changes
    int Ni = 0;
@@ -283,7 +301,7 @@ void Mfia_Hamiltonian::change(Mfia_Hamiltonian::Config& sigma, Mfia_Observables&
    int dP = 2*stagmask[ispin]*dR;
    int dM2 = dM*dM + 2*macro.M*dM;        // (M+dM)^2-M^2
    // Assign new values
-   macro.E += -JSIGN*dN-H*dM-AhbV*dM2;    // JSIGN*dN-H*dM-AhbV*dM2;
+   macro.E += -JSIGN*dN-macro.H*dM-AhbV*dM2;    // JSIGN*dN-H*dM-AhbV*dM2;
    macro.M += dM;
    macro.N += dN;
    macro.P += dP;
@@ -292,7 +310,7 @@ void Mfia_Hamiltonian::change(Mfia_Hamiltonian::Config& sigma, Mfia_Observables&
    macro.R = macro.U/2;
    macro.X = macro.P;
    macro.E_N = -JSIGN*macro.N;            // JSIGN*macro.N;
-   macro.E_H = -H*macro.M;
+   macro.E_H = -macro.H*macro.M;
    macro.E_A = -AhbV*macro.M*macro.M;
    macro.V   = V;
    // Flip the spin
