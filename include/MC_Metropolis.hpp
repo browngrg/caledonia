@@ -58,7 +58,6 @@ public:
       this->NWindow = 1;
       this->NWalkPerProcess = 10;
       this->re_iter = 0;
-//      this->filename = "";
       this->Adjust_kT = true;
       at_wall_limit = false;
       wall_limit = 24*60*60;
@@ -184,16 +183,15 @@ void MC_Metropolis::DoSample(Hamiltonian& hamilton, std::vector<MCWalker>& walke
 template<typename MCWalker>
 void MC_Metropolis::InitPool(std::vector<MCWalker>& walkerpool)
 {
+#  ifdef USE_MPI
+   if( mp.in() ) MPI_Comm_rank(mp.comm,&mp.iproc);
+   if( mp.in() ) MPI_Comm_size(mp.comm,&mp.nproc);
+#  endif
    ptime.mp = mp;
    ptime.start();
    ckpt_last = ptime.elapsed();
    at_wall_limit = false;
    if(this->NWalkPerProcess<1) this->NWalkPerProcess=1;
-   //mp.init(NWindow);
-#  ifdef USE_MPI
-   if( mp.in() ) MPI_Comm_rank(mp.comm,&mp.iproc);
-   if( mp.in() ) MPI_Comm_size(mp.comm,&mp.nproc);
-#  endif
    walkerpool.resize(this->NWalkPerProcess);
    for(int iwalk=1; iwalk<walkerpool.size(); iwalk++)
       walkerpool[iwalk]=walkerpool[0];
