@@ -138,7 +138,7 @@ void EMX_Measure::write()
 #  ifdef USE_MPI
    if(mp.in()) MPI_Allreduce(&(statbuff[0]),&(stat_global[0]),nbuff,MPI_DOUBLE,MPI_SUM,mp.comm);
 #  else
-   em_global = em_map;
+   stat_global = statbuff;
 #  endif
    if( mp.iproc==0 )
    {
