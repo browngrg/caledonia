@@ -122,6 +122,7 @@ public:
    bool LinearInterp;                  // Use linear interpolation for DOS (good for continuous energy domain)
    double wleta;                       // weighting between WL and ITTM. See Eq. (24) of
                                        // RG Ghulghazaryan, S. Hayryan, CK Hu, J Comp Chem 28,  715-726 (2007)
+   bool convh;                         // Converge via ln(g_i+1) = ln(g_i) + ln(h_i) when wlgamma = 0;
    bool output_configs;
 
    double kTlo, kThi;                  // Range of output temperatures for WriteWLBoltzmann
@@ -175,6 +176,7 @@ MC_WangLandau::MC_WangLandau()
    Qquit    = 1.e-4;
    wlgamma_start = 1.;
    wleta    = 0;
+   convh    = false;
    re_iter  = 0;
    LinearInterp = true;
    Elo      = +std::numeric_limits<double>::max();         // Elo,Ehi,Ebin,nbin, and fwinover depend on each other
@@ -208,6 +210,7 @@ void MC_WangLandau::copy(const MC_WangLandau& orig)
    Qquit = orig.Qquit;
    wlgamma_start = orig.wlgamma_start;
    wleta = orig.wleta;
+   convh = orig.convh;
    beginwin = orig.beginwin;
    Ewin = orig.Ewin;
    mp_window = orig.mp_window;
@@ -775,6 +778,8 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
          walkerpool[iwalk].Sfixed = walkerpool[iwalk].S;  // zeros from above
    }
    //std::cout << model.header();
+   double qthresh = 1;
+   double WLQold = 0;
    double fvisit_old = 0;
    unsigned long int istep = 0;
    unsigned long int iloop = 0;
@@ -784,7 +789,7 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
       if(verbose && iupdate>5) 
       {
          verbose = false;
-         std::cout << __FILE__ << ":" << __LINE__ << " iupdate=" << iupdate << ". Going silent on DoTMConverge." << std::endl;
+         std::cout << __FILE__ << ":" << __LINE__ << " iupdate=" << iupdate << ". Going silent on DoConverge." << std::endl;
       }
       // Sampling
       for(int iwalk=0; iwalk<NWalker; iwalk++)
@@ -798,37 +803,72 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
       WriteWLDOS(global_walker,iupdate);
       WriteWLBoltzmann(global_walker,iupdate);
       if( output_configs ) WriteWalkers(walkerpool,iupdate);
-      DoReplicaExchange(model,walkerpool);
+      if( mp_window.ngang>1 ) DoReplicaExchange(model,walkerpool);
       // Decide about advancing WL parameter
       int ivisit = 0;
       for(int ibin=0; ibin<global_walker.h.size(); ibin++)
          ivisit += (global_walker.h[ibin]>0);
       double fvisit = static_cast<double>(ivisit)/static_cast<double>(global_walker.h.size());
       bool allvisit = (ivisit==global_walker.h.size());
+      if ( fvisit==fvisit_old && (ivisit>(global_walker.h.size()-11)) ) allvisit = true;  // Allow for some empty bins
+      bool qconverged = (std::fabs(WLQ-WLQold)<qthresh);
       if( mp_window.pool.iproc==0 )
       {
          double psecs = static_cast<double>(clock())/static_cast<double>(CLOCKS_PER_SEC);
          std::cout << "loop= " << iloop << " level=" << iupdate << " WLgamma=" << walkerpool[0].wlgamma << " WLQ=" << WLQ << " istep=" << istep << " visit=" << fvisit << " time = " << psecs << " secs" << std::endl;
       }
       // Work on convergence
-      if( WLQ<Qquit  && ( allvisit  || ( fvisit==fvisit_old && (ivisit>(global_walker.h.size()-11)) ) ) )
+      if( global_walker.wlgamma>0 && WLQ>Qquit && allvisit   )
       {
          for(int iwalk=0; iwalk<NWalker; iwalk++)
          {
             int iwin = walkerpool[iwalk].window.iwindow;
             int istart = global_walker.window.bin(Ewin[1*iwin+0]);
             for(int ibin=0; ibin<walkerpool[iwalk].S.size(); ibin++)
-            {
                walkerpool[iwalk].S[ibin]  = (1.-wleta)*global_walker.S[istart+ibin]+wleta*(global_walker.Sittm[istart+ibin]-walkerpool[iwalk].Sfixed[ibin]);
-            }
             walkerpool[iwalk].wlgamma /= 2;
          }
-         iupdate++;
          fvisit = 0;
+         WLQold = 0;
          for(int iwalk=0; iwalk<NWalker; iwalk++)
                std::fill(walkerpool[iwalk].h.begin(),walkerpool[iwalk].h.end(),0);
          istep = 0;
+         iupdate++;
       }
+      if( global_walker.wlgamma==0 && this->convh && qconverged )
+      {
+         double global_min = 1e-20;
+         for(int ibin=0; ibin<global_walker.h.size(); ibin++) 
+            if( global_walker.h[ibin]>0 && global_walker.h[ibin]<global_min ) global_min = global_walker.h[ibin];
+         global_min = std::log(global_min);
+         double ittm_min = 0;
+         for(int ibin=0; ibin<global_walker.h.size(); ibin++) 
+            if( global_walker.h[ibin]>0 && global_walker.Sittm[ibin]<ittm_min ) ittm_min = global_walker.Sittm[ibin];
+         for(int iwalk=0; iwalk<NWalker; iwalk++)
+         {
+            int iwin = walkerpool[iwalk].window.iwindow;
+            int istart = global_walker.window.bin(Ewin[1*iwin+0]);
+            for(int ibin=0; ibin<walkerpool[iwalk].S.size(); ibin++)
+            {
+               double lng = global_min;
+               if( global_walker.h[istart+ibin]>0 ) lng = std::log(global_walker.h[istart+ibin]);
+               double ittm = walkerpool[iwalk].S[ibin];
+               if( global_walker.Sittm[istart+ibin]!=0 ) ittm = global_walker.Sittm[istart+ibin]-walkerpool[iwalk].Sfixed[ibin];
+               walkerpool[iwalk].S[ibin]  = (1.-wleta)*(walkerpool[iwalk].S[ibin]+lng) + wleta*ittm;
+            }
+         }
+         if( allvisit )
+         {  // Only call it an update if visiting all bins
+            iupdate++;
+            istep = 0;
+            qthresh *= 0.1;
+         }
+         fvisit = 0;
+         WLQold = 0;
+         for(int iwalk=0; iwalk<NWalker; iwalk++)
+               std::fill(walkerpool[iwalk].h.begin(),walkerpool[iwalk].h.end(),0);
+      }
+      WLQold = WLQ;
       fvisit_old = fvisit;
       iloop++;
    }
