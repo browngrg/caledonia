@@ -97,7 +97,7 @@ public:
    double MPI;                     // Value of pi used in step_along spin
 
    template<typename URNG>
-   void step_along_spin(double cartesian_spin[3], double step_size, URNG& urng);
+   void step_along_spin(double cartesian_spin[3], double step_size, URNG& urng) const;
 
    // Calculate all macroscopic variables based on this sigma
    virtual void calc_observable(Config& sigma, Heisenberg_Observables& macro);
@@ -138,6 +138,7 @@ public:
 
    void initial_mixed(Config& sigma) const;
    void initial_ferro(Config& sigma) const;
+   template<typename URNG> void initial_random(Config& sigma, URNG& urng) const;
 
 };
 
@@ -236,7 +237,7 @@ void Heisenberg_Hamiltonian::calc_observable(Heisenberg_Hamiltonian::Config& sig
 
 
 template<typename URNG>
-void Heisenberg_Hamiltonian::step_along_spin(double cartesian_spin[3], double step_size, URNG& urng)
+void Heisenberg_Hamiltonian::step_along_spin(double cartesian_spin[3], double step_size, URNG& urng) const
 {
    if( false && (step_size>1 || step_size<0) )
    {
@@ -399,6 +400,19 @@ void Heisenberg_Hamiltonian::initial_ferro(Heisenberg_Hamiltonian::Config& sigma
       sigma[3*ispin+0] = 0;
       sigma[3*ispin+1] = 0;
       sigma[3*ispin+2] = 1;
+   }
+}
+
+template<typename URNG>
+void Heisenberg_Hamiltonian::initial_random(Heisenberg_Hamiltonian::Config& sigma, URNG& urng) const
+{
+   sigma.resize(3*nspin);
+   for(int ispin=0; ispin<nspin; ispin++) 
+   {
+      sigma[3*ispin+0] = 0;
+      sigma[3*ispin+1] = 0;
+      sigma[3*ispin+2] = 1;
+      step_along_spin(&(sigma[3*ispin]),1,urng);
    }
 }
 
