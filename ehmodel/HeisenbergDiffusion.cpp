@@ -7,6 +7,7 @@
 #include"MPI_Struct.hpp"
 #include"Heisenberg_Hamiltonian.hpp"
 #include"Meas_Diffusion.hpp"
+#include"Null_Measure.hpp"
 #include"Random.hpp"
 #include"ProgramOptions.hpp"
 
@@ -85,13 +86,16 @@ void DoHeisenberg(int& argc, char* argv[])
    // Construct a hamiltonian object 
    typedef Heisenberg_Hamiltonian HAMILTONIAN;
    HAMILTONIAN hamilton;
-   hamilton.L     = 64;
+   hamilton.L     = 16;
    hamilton.H     = 0;
    options.add_option("length", "extent of lattice in each dim", 'L', &(hamilton.L) );
    options.add_option("H",      "magnitude of magnetic field",   'H', &(hamilton.H) );
 
    // Construct the simulation object
    MC_WangLandau wanglandau;
+   wanglandau.Elo   = -11000;
+   wanglandau.Ehi   = +11000;
+   wanglandau.Ebin  = 1;
    options.add_option( "Elo",     "lower side of energy window",    ' ', &(wanglandau.Elo));
    options.add_option( "Ehi",     "lower side of energy window",    ' ', &(wanglandau.Ehi));
    options.add_option( "Ebin",    "width of energy bins",           ' ', &(wanglandau.Ebin));
@@ -102,12 +106,18 @@ void DoHeisenberg(int& argc, char* argv[])
    options.add_option( "maxupdate","maximum number of iterations",  ' ', &(wanglandau.MaxUpdate));
    options.add_option( "dosinterp","linear interpolation of dos",   ' ', &(wanglandau.LinearInterp));
    options.add_option( "wleta",    "weighting between WL and ITTM", ' ', &(wanglandau.wleta));
+   options.add_option( "convh",    "converge using visit histogrma",' ', &(wanglandau.convh));
    options.add_option( "wlgamma",  "starting value of WL parameter",' ', &(wanglandau.wlgamma_start));
    options.add_option( "Q",        "target convergence factor",     ' ', &(wanglandau.Qquit));
    options.add_option( "configout","output configurations to disk", ' ', &(wanglandau.output_configs));
 
+#  undef MEASURE_DIFFUSION
+#  ifdef MEASURE_DIFFUSION
    Meas_Diffusion measure;
    options.add_option( "diff_delay","delay in measuring diffusion", ' ', &(measure.delay));
+#  else
+   Null_Measure measure;
+#  endif
 
    // Local options
    char lng_est_fn[512]; lng_est_fn[0]=0;
@@ -129,11 +139,6 @@ void DoHeisenberg(int& argc, char* argv[])
    wanglandau.urng.seed( ParallelSeed(SeedFromClock()) );
    bool rng_output = false;
    bool rng_failed = RNGTestMoments(wanglandau.urng,rng_output,std::cout);
-   if( rng_failed )
-   {
-      cout << "Problem detected with random number generator" << endl;
-      return;
-   }
    if(verbose) cout << __FILE__ << ":" << __LINE__ << " Random number generator created" << endl;
 
    // Construct a representation of the model
@@ -143,7 +148,7 @@ void DoHeisenberg(int& argc, char* argv[])
    typedef WL_Walker<HAMILTONIAN::Config,HAMILTONIAN::Observables> Walker;
    std::vector<Walker> walkerpool(1);
    walkerpool[0].sigma.resize(NGrid);
-   hamilton.initial_ferro(walkerpool[0].sigma);
+   hamilton.initial_random(walkerpool[0].sigma,wanglandau.urng);
    hamilton.calc_observable(walkerpool[0].sigma,walkerpool[0].now);
    wanglandau.verbose = verbose;
    wanglandau.mp_window.pool = MPI_Struct::world();
@@ -152,6 +157,25 @@ void DoHeisenberg(int& argc, char* argv[])
    std::vector<double> energy;
    std::vector<double> est_lng;
    ReadLngEst(std::string(lng_est_fn),energy,est_lng);
+   if( false && energy.size()<3 )
+   {
+      energy.resize(1000);
+      est_lng.resize(1000);
+      // Set the fixed DOS to spin-wave part (N-1)*( ln(1+x)+ln(1-x) )
+      double N = static_cast<double>( walkerpool[0].now.V );    // Volume of the system
+      double Eb = -3*N;
+      double Et = +3*N;
+      double de = (Et-Eb)/1000; 
+      for(int i=0; i<1000; i++)
+      {
+          double x = -1 + 2*(static_cast<double>(i+1)/1001.);
+          if( x>-1 && x<1 )
+          {
+             energy[i] = Eb + (x+1.)*(Et-Eb)/2.;
+             est_lng[i] = (N-1.)*(std::log(1+x)+std::log(1-x));
+          }
+      }
+   }
    if( energy.size()>0 )
    {
       TrimLng(wanglandau.Elo,wanglandau.Ehi,energy,est_lng); 
@@ -161,8 +185,10 @@ void DoHeisenberg(int& argc, char* argv[])
    }
    if(verbose) cout << __FILE__ << ":" << __LINE__ << " Done create one walker" << endl;
 
+#  ifdef MEASURE_DIFFUSION
    measure.init(wanglandau.Elo,wanglandau.Ehi,wanglandau.Ebin);
    if(verbose) cout << __FILE__ << ":" << __LINE__ << " Measurement object initialized" << endl;
+#  endif
 
    wanglandau.DoConverge(hamilton,walkerpool,measure);
 
