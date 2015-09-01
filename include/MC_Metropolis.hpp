@@ -24,7 +24,6 @@ public:
 
    float kTmin,kTmax;          // The temperature range
    std::vector<float> kTlist;  // Number of different temperature
-   bool Adjust_kT;
 
    long NStep;                 // Number of steps to take between measurements to minimize correlations
    long NMeas;                 // Number of measurements to take
@@ -58,7 +57,6 @@ public:
       this->NWindow = 1;
       this->NWalkPerProcess = 10;
       this->re_iter = 0;
-      this->Adjust_kT = true;
       at_wall_limit = false;
       wall_limit = 24*60*60;
       ckpt_freq  = 10*60;
@@ -216,7 +214,6 @@ void MC_Metropolis::InitPool(std::vector<MCWalker>& walkerpool)
             new_kTlist.push_back(kT);
          }
       }
-      this->Adjust_kT = false;
       if( mp.iproc==0 ) std::cout << "Read " << new_kTlist.size() << " temperatures from input" << std::endl;
    }
    if( new_kTlist.size()==0 )
@@ -227,7 +224,6 @@ void MC_Metropolis::InitPool(std::vector<MCWalker>& walkerpool)
       if(kTnum>1) { dTemp = (kTmax-kTmin)/static_cast<float>(kTnum-1); }
       new_kTlist.resize(kTnum);
       for(int i=0; i<kTnum; i++) new_kTlist[i] = kTmin + dTemp*i;
-      this->Adjust_kT = true;
    }
    this->set_kT(new_kTlist,walkerpool);
    if(false)
@@ -266,6 +262,21 @@ void MC_Metropolis::set_kT(const std::vector<float>& new_kT, std::vector<Walker>
    }
    kTmin = kTlist.front();
    kTmax = kTlist.back();
+   if( false && mp.in() )
+   {
+      char filename[100];
+      sprintf(filename,"MC_MetropSetkT_%d",mp.iproc);
+      std::ofstream fout(filename);
+      fout << "# Column 1: iwalk local" << std::endl;
+      fout << "# Column 2: iwalk global" << std::endl;
+      fout << "# Column 3: kTi" << std::endl;
+      fout << "# Column 4: kT" << std::endl;
+      fout << "# Column 5: kT[kTi]" << std::endl;
+      for(int iwalk=0; iwalk<walkerpool.size(); iwalk++)
+      {
+         fout << iwalk << " " << walkerpool[iwalk].iwalk_global << " " << walkerpool[iwalk].kTi << " " << walkerpool[iwalk].kT << " " << kTlist[ walkerpool[iwalk].kTi ] << std::endl;
+      }
+   }
 }
 
 
@@ -318,17 +329,6 @@ void MC_Metropolis::CalcOptimal_kT(std::vector<MCWalker>& walker, bool DoAdjust)
    while( new_kT.back()<kTmax && new_kT.size()<100000 )
    {
       int i = ilast+1;
-      /*
-      if( ((mean[i]-Ei)/kTlist[i])<1 )
-      {
-         while( ((mean[i]-Ei)/kTlist[i])<1 && i<mean.size() ) i++;
-         new_kT.push_back(kTlist[i]);
-         ilast = i;
-         Ei = mean[i];
-         sigi = sigma[i];
-         continue;
-      } 
-      */
       if( sigi==0 && i<(sigma.size()-1) )
       {
          while( sigma[i]==0 && i<(sigma.size()-1) ) i++;
@@ -395,6 +395,8 @@ void MC_Metropolis::read_config(Hamilton& hamilton, std::vector<MCWalker>& walke
       {
          double kT,E,imcs;
          fin >> kT >> E >> imcs;
+         if( kT !=walker[iwalk].kT )
+            std::cout << __FILE__ << ":" << __LINE__ << " Config temp not match set temp" << std::endl;
          for(int i=0; i<walker[iwalk].sigma.size(); i++) fin >> walker[iwalk].sigma[i];
          hamilton.calc_observable(walker[iwalk].sigma,walker[iwalk].now);
       }
