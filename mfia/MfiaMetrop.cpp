@@ -86,11 +86,19 @@ void DoIt(int& argc, char* argv[])
    // and the macroscopic quantities like magnetization and energy
    typedef RE_Walker<HAMILTONIAN::Config,HAMILTONIAN::Observables> Walker;
    std::vector<Walker> walkerpool(1);
-   hamilton.initial_mixed(walkerpool[0].sigma);
-   // Flip +/- FM depending on applied field
-   const bool prepare_metastable = false;
-   if( hamilton.H<0 || prepare_metastable )
-      for(int ispin=0; ispin<walkerpool[0].sigma.size(); ispin++) walkerpool[0].sigma[ispin] *= -1;
+   const bool prepare_AFM = false;
+   if( prepare_AFM )
+   {
+      hamilton.initial_antiferro(walkerpool[0].sigma);
+   }
+   else
+   {
+      hamilton.initial_mixed(walkerpool[0].sigma);
+      // Flip +/- FM depending on applied field
+      const bool prepare_metastable = false;
+      if( hamilton.H<0 || prepare_metastable )
+         for(int ispin=0; ispin<walkerpool[0].sigma.size(); ispin++) walkerpool[0].sigma[ispin] *= -1;
+   }
    hamilton.calc_observable(walkerpool[0].sigma,walkerpool[0].now);
    simulator.mp = MPI_Struct::world();
    simulator.InitPool(walkerpool);
@@ -100,7 +108,10 @@ void DoIt(int& argc, char* argv[])
       for(int ispin=0; ispin<walkerpool[1].sigma.size(); ispin++) walkerpool[1].sigma[ispin] *= -1;
       hamilton.calc_observable(walkerpool[1].sigma,walkerpool[1].now);
       for(int iwalk=3; iwalk<walkerpool.size(); iwalk+=2)
-         walkerpool[iwalk].copy(walkerpool[1]);
+      {
+         walkerpool[iwalk].sigma = walkerpool[1].sigma;
+         walkerpool[iwalk].now = walkerpool[1].now;
+      }
    }
    // Read configurations from disk, if they exist
    simulator.read_config(hamilton,walkerpool);
