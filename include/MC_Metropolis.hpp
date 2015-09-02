@@ -48,6 +48,7 @@ public:
 
    MC_Metropolis()
    {
+      this->mp = MPI_Struct::world();
       this->kTmin  = 0.5;
       this->kTmax  = 3;
       this->NStep  = 10;
