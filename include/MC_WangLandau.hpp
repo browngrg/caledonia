@@ -781,6 +781,8 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
    double qthresh = 1;
    double WLQold = 0;
    double fvisit_old = 0;
+   double fvisit_target = 1;
+   int    fvisit_same = 0;
    unsigned long int istep = 0;
    unsigned long int iloop = 0;
    unsigned long int iupdate = 0;
@@ -809,8 +811,23 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
       for(int ibin=0; ibin<global_walker.h.size(); ibin++)
          ivisit += (global_walker.h[ibin]>0);
       double fvisit = static_cast<double>(ivisit)/static_cast<double>(global_walker.h.size());
-      bool allvisit = (ivisit==global_walker.h.size());
-      if ( fvisit==fvisit_old && (ivisit>(global_walker.h.size()-11)) ) allvisit = true;  // Allow for some empty bins
+      bool allvisit = (fvisit>=fvisit_target);
+      if ( fvisit==fvisit_old )
+      {
+        fvisit_same++;
+        if( fvisit_same>=10   && fvisit>0.99 ) allvisit = true;  // Allow for some empty bins
+        if( fvisit_same>=100  && fvisit>0.95 ) allvisit = true;  // Allow for some empty bins
+        if( fvisit_same>=1000 && fvisit>0.90 ) allvisit = true;  // Allow for some empty bins
+        if( allvisit ) 
+        {
+           fvisit_target = fvisit;
+           if( mp_window.pool.iproc==0 ) std::cout << "New target for fraction of bins visited = " << fvisit_target << std::endl;
+        }
+      }
+      else
+      {
+         fvisit_same = 0;
+      }
       bool qconverged = (std::fabs(WLQ-WLQold)<qthresh);
       if( mp_window.pool.iproc==0 )
       {
@@ -818,7 +835,7 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
          std::cout << "loop= " << iloop << " level=" << iupdate << " WLgamma=" << walkerpool[0].wlgamma << " WLQ=" << WLQ << " istep=" << istep << " visit=" << fvisit << " time = " << psecs << " secs" << std::endl;
       }
       // Work on convergence
-      if( global_walker.wlgamma>0 && WLQ>Qquit && allvisit   )
+      if( global_walker.wlgamma>0 && WLQ<Qquit && allvisit   )
       {
          for(int iwalk=0; iwalk<NWalker; iwalk++)
          {
@@ -835,7 +852,7 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
          istep = 0;
          iupdate++;
       }
-      if( global_walker.wlgamma==0 && this->convh && qconverged )
+      if( global_walker.wlgamma==0 && this->convh && qconverged && allvisit )
       {
          double global_min = 1e-20;
          for(int ibin=0; ibin<global_walker.h.size(); ibin++) 
