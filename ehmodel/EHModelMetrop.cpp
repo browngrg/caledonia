@@ -20,6 +20,7 @@
 #include"MC_Metropolis.hpp"
 #include"RE_Walker.hpp"
 #include"EMX_Measure.hpp"
+#include"Null_Measure.hpp"
 #include"EHModel_Hamiltonian.hpp"
 #include"Random.hpp"
 #include"ProgramOptions.hpp"
@@ -99,23 +100,16 @@ void DoIt(int& argc, char* argv[])
    simulator.read_config(hamilton,walkerpool);
    // seed the random number geneator
    simulator.urng.seed( ParallelSeed(SeedFromClock()) );
-#  if 0
-   bool rng_output = false;
-   bool rng_failed = RNGTestMoments(simulator.urng,rng_output,std::cout);
-   if( rng_failed )
-   {
-      std::cout << "Problem detected with random number generator" << std::endl;
-      return;
-   }
-#  endif
-
 
    // Object for accumulating equilibrium statistics
+#  undef MEASURE_EMX
+#  ifdef MEASURE_EMX
    EMX_Measure measure_obj;
-   measure_obj.add_header( hamilton.header() ); 
-   measure_obj.add_header( simulator.header() ); 
-   measure_obj.mp_window = simulator.mp_window;
+   measure_obj.mp= simulator.mp;
    measure_obj.init(Emin,Emax,Ebin);
+#  else
+   Null_Measure measure_obj;
+#  endif
    // Do the simulation
    simulator.DoSample(hamilton,walkerpool,measure_obj); 
    options.write();
