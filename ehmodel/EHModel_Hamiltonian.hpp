@@ -34,6 +34,7 @@ public:
 
    int nngbr;                      // Number of neighbors per spin
    std::vector<double> KiJij;      // Array of exchange constants and anisotropy information
+   std::vector<double> moment;     // Magnetic moment of each atom
 
    // Calculate all macroscopic variables based on this sigma
    void calc_observable(Config& sigma, Heisenberg_Observables& macro);
@@ -153,8 +154,8 @@ void EHModel_Hamiltonian::calc_observable(Config& sigma, Heisenberg_Observables&
    for(int ispin=0; ispin<nspin; ispin++) 
    {
       // increment global magnetization
-      for(int j=0; j<3; j++) mag[j] += S[3*ispin+j];
-      stag += stagmask[ispin]*S[3*ispin+2]; // stagmask[ispin]*( mag[0]*S[3*ispin+0] + mag[1]*S[3*ispin+1] + mag[2]*S[3*ispin+2] );
+      for(int j=0; j<3; j++) mag[j] += moment[ispin]*S[3*ispin+j];
+      stag += stagmask[ispin]*moment[ispin]*S[3*ispin+2];
       // calculate anisotropy energy KiJij[kx,ky,kz,Kmag]
       double sdotk = 0;
       for(int j=0; j<3; j++) sdotk += S[3*ispin+j]*KiJij[iptr++];
@@ -198,12 +199,12 @@ void EHModel_Hamiltonian::change(EHModel_Hamiltonian::Config& sigma, Heisenberg_
              +   S[3*(ispin)+1]*S[3*jspin[nngbr*ispin+j]+1] 
              +   S[3*(ispin)+2]*S[3*jspin[nngbr*ispin+j]+2] );
    }
-   macro.Mstag -= stagmask[ispin]*S[3*ispin+2]; 
-   for(int k=0; k<3; k++)  macro.M3d[k] -= S[3*ispin+k];
+   macro.Mstag -= stagmask[ispin]*moment[ispin]*S[3*ispin+2]; 
+   for(int k=0; k<3; k++)  macro.M3d[k] -= moment[ispin]*S[3*ispin+k];
    // Make move
    for(int k=0; k<3; k++) S[3*ispin+k] = new_sigma[k];
    // Calculate after
-   for(int k=0; k<3; k++)  macro.M3d[k] += S[3*ispin+k];
+   for(int k=0; k<3; k++)  macro.M3d[k] += moment[ispin]*S[3*ispin+k];
    macro.Mmag2 = macro.M3d[0]*macro.M3d[0] + macro.M3d[1]*macro.M3d[1] + macro.M3d[2]*macro.M3d[2];
    iptr = (nngbr+4)*ispin;
    sdotk = 0;
@@ -226,7 +227,7 @@ void EHModel_Hamiltonian::change(EHModel_Hamiltonian::Config& sigma, Heisenberg_
    macro.X   = std::sqrt(macro.Mmag2);
    macro.M   = (H==0)? macro.X : macro.M3d[2];
    // check energy
-   if( false ) {
+   if( true ) {
       static int icount = 0;
       Heisenberg_Observables direct(macro);
       calc_observable(sigma,direct);
@@ -300,6 +301,8 @@ void EHModel_Hamiltonian::read_pairs(std::string filename)
          }
       }
    }
+   moment.resize(nspin);
+   for(int ispin=0; ispin<nspin; ispin++) moment[ispin] = 1;
    if( true ) write_KiJij("EHModel-KiJij.txt");
 }
 
