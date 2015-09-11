@@ -383,7 +383,7 @@ double MC_WangLandau::WLAnalyze(const std::vector<double>& h, int ibegin, int ie
          hbin++; 
       } 
    }
-   if( hbin<10 ) return Q;
+   if( hbin<1 ) return Q;
    double hnorm = static_cast<double>(hbin)/static_cast<double>(htot);
    if( false )
    {
@@ -786,6 +786,7 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
    unsigned long int istep = 0;
    unsigned long int iloop = 0;
    unsigned long int iupdate = 0;
+   WLWalker global_walker;
    while( iupdate<MaxUpdate )
    {
       if(verbose && iupdate>5) 
@@ -799,7 +800,6 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
       istep += NChunk;
       // Analysis
       measure.write();
-      WLWalker global_walker;
       double WLQ = DoAnalyzeMPI(walkerpool,global_walker);
       global_walker.wlgamma = walkerpool[0].wlgamma;
       WriteWLDOS(global_walker,iupdate);
@@ -814,11 +814,13 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
       bool allvisit = (fvisit>=fvisit_target);
       if ( fvisit==fvisit_old )
       {
+        bool started = allvisit;
         fvisit_same++;
         if( fvisit_same>=10   && fvisit>0.99 ) allvisit = true;  // Allow for some empty bins
-        if( fvisit_same>=100  && fvisit>0.95 ) allvisit = true;  // Allow for some empty bins
-        if( fvisit_same>=1000 && fvisit>0.90 ) allvisit = true;  // Allow for some empty bins
-        if( allvisit ) 
+        if( fvisit_same>=50   && fvisit>0.95 ) allvisit = true;  // Allow for some empty bins
+        if( fvisit_same>=1000 && fvisit>0.90 ) allvisit = true;   // Allow for some empty bins
+        if( global_walker.wlgamma==1 && fvisit_same>=20  ) allvisit = true;  // Allow for many empty
+        if( !started && allvisit ) 
         {
            fvisit_target = fvisit;
            if( mp_window.pool.iproc==0 ) std::cout << "New target for fraction of bins visited = " << fvisit_target << std::endl;
@@ -888,6 +890,14 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
       WLQold = WLQ;
       fvisit_old = fvisit;
       iloop++;
+   }
+   // Copy global walker histogram into walks
+   for(int iwalk=0; iwalk<NWalker; iwalk++)
+   {
+      int iwin = walkerpool[iwalk].window.iwindow;
+      int istart = global_walker.window.bin(Ewin[1*iwin+0]);
+      for(int ibin=0; ibin<walkerpool[iwalk].h.size(); ibin++)
+         walkerpool[iwalk].h[ibin] = global_walker.h[istart+ibin];
    }
 }
 

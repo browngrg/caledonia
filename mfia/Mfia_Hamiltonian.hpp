@@ -143,9 +143,11 @@ public:
 
    // Make an attempted Monte Carlo step
    enum { SPINFLIP = true };
+   bool op_constrained;
    template<typename MCWalker, typename URNG> void mc_step(MCWalker& walker, URNG& urng);
    template<typename MCWalker, typename URNG> void spin_flip(MCWalker& walker, URNG& urng);
    template<typename MCWalker, typename URNG> void spin_exch(MCWalker& walker, URNG& urng);
+   template<typename MCWalker, typename URNG> void spin_exch2(MCWalker& walker, URNG& urng);
 
 
 public:
@@ -171,6 +173,7 @@ Mfia_Hamiltonian::Mfia_Hamiltonian(int DIM, int Lval, bool AFM)
    if(!AFM) JSIGN = +1;
    A = H = 0;
    use_walker_H = false;
+   op_constrained = false;
    this->init();
 }
 
@@ -321,10 +324,15 @@ void Mfia_Hamiltonian::change(Mfia_Hamiltonian::Config& sigma, Mfia_Observables&
 template<typename MCWalker, typename URNG> 
 void Mfia_Hamiltonian::mc_step(MCWalker& walker, URNG& urng)
 {
-   if( SPINFLIP )
-      this->spin_flip(walker,urng);
+   if( op_constrained )
+      this->spin_exch2(walker,urng);
    else
-      this->spin_exch(walker,urng);
+   {
+      if( SPINFLIP )
+         this->spin_flip(walker,urng);
+      else
+         this->spin_exch(walker,urng);
+   }
 }
 
 
@@ -358,6 +366,50 @@ void Mfia_Hamiltonian::spin_exch(MCWalker& walker, URNG& urng)
    char s_j = walker.sigma[jsite];
    this->change(walker.sigma,walker.now,isite,s_j);      // spin_flip updates walker.old as build new state
    this->change(walker.sigma,walker.now,jsite,s_i);
+}
+
+template<typename MCWalker, typename URNG> 
+void Mfia_Hamiltonian::spin_exch2(MCWalker& walker, URNG& urng)
+{
+   int ThetaA = (walker.now.V+walker.now.M+walker.now.P)/4;
+   int ThetaB = (walker.now.V+walker.now.M-walker.now.P)/4;
+   bool uniformA = ( ThetaA==0 || ThetaA==(walker.now.V/2) );
+   bool uniformB = ( ThetaB==0 || ThetaB==(walker.now.V/2) );
+   if( uniformA && uniformB )
+   {
+      std::cout << __FILE__ << ":" << __LINE__ << " mc_step2 can't change uniform sublattices" << std::endl;
+      std::cout << "ThetaA=" << ThetaA << " ThetaB=" << ThetaB << " M=" << walker.now.M << " Phi=" << walker.now.P << " N=" << walker.now.V << std::endl;
+      return;
+   }
+   // Randomly choose a spin
+   int NSite = walker.sigma.size();
+   int isite = -1;
+   bool notok = true;
+   while( notok )
+   {
+      isite = -1;
+      while( isite<0 || isite>=NSite )
+         isite = static_cast<int>(NSite*urng());
+      notok = (stagmask[isite]>0)? uniformA : uniformB;
+   }
+   char sold =  walker.sigma[isite];
+   char snow = -walker.sigma[isite];
+   // Find an opposite spin on the same sublattice
+   int jsite = -1;
+   notok = true;
+   while( notok )
+   {
+      jsite = -1;
+      while( jsite<0 || jsite>=NSite )
+         jsite = static_cast<int>(NSite*urng());
+      notok = (stagmask[isite]!=stagmask[jsite]) || (walker.sigma[jsite]==sold);
+   }
+   // Make the change
+   walker.save_initial();
+   walker.add_change(isite);
+   this->change(walker.sigma,walker.now,isite,snow);
+   walker.add_change(jsite);
+   this->change(walker.sigma,walker.now,jsite,sold);
 }
 
 template<typename MCWalker, typename URNG> 

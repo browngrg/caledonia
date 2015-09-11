@@ -66,6 +66,20 @@ public:
       return tmp;
    }
 
+   static MPI_Struct local()
+   {
+      MPI_Struct w = world();
+      MPI_Struct tmp;
+#     ifdef USE_MPI
+      MPI_Comm_split(w.comm,w.iproc,0,&(tmp.comm));
+      MPI_Comm_rank(tmp.comm,&tmp.iproc);
+      MPI_Comm_size(tmp.comm,&tmp.nproc);
+#     else
+      tmp.iproc = 0;
+      tmp.nproc = 1;
+#     endif
+      return tmp;
+   }
 };
 
 #endif
