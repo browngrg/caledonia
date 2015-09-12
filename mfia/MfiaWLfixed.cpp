@@ -42,6 +42,10 @@ void DoIt(int& argc, char* argv[])
 
    // Construct the sampling object
    MC_WangLandau wanglandau;
+   wanglandau.wleta = 0;
+   wanglandau.wlgamma_start = 1;
+   wanglandau.Qquit = 0.001;
+   wanglandau.MaxUpdate = 15;
    wanglandau.NWindow = 1;
    //options.add_option( "numwin",  "number of windows",              ' ', &(wanglandau.NWindow));
    options.add_option( "numwalk", "number of walkers per window",   ' ', &(wanglandau.NWalkPerProcess));
