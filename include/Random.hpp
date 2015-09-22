@@ -196,8 +196,13 @@ long ParallelSeed(long baseSeed)
 #  ifdef USE_MPI
    // Get process id and global seed value
    int iproc = 0;
-   MPI_Comm_rank(MPI_COMM_WORLD,&iproc);
-   MPI_Bcast(&seed_val,1,MPI_LONG,0,MPI_COMM_WORLD);
+   int init = false;
+   MPI_Initialized(&init);
+   if( init )
+   {
+      MPI_Comm_rank(MPI_COMM_WORLD,&iproc);
+      MPI_Bcast(&seed_val,1,MPI_LONG,0,MPI_COMM_WORLD);
+   }
    // set seed, get iproc-th result as my seed
    const int stride = 10;
 #  ifdef USE_C11
