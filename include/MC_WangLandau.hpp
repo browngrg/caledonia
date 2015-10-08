@@ -634,6 +634,7 @@ void MC_WangLandau::DoConstrictorSample(Model& model, std::vector<Walker>& walke
       std::fill(walker.S.begin(),walker.S.end(),0);            // Enforce S==0 outside stage window
       walker.wlgamma = 1;
    }
+   long NChunkDo = NChunk*walkerpool[0].now.V;
    // Do the actual convergence
    if(verbose) std::cout << __FILE__ << ":" << __LINE__ << std::endl;
    std::vector<bool> converged(NWindow_Local,false);
@@ -648,8 +649,8 @@ void MC_WangLandau::DoConstrictorSample(Model& model, std::vector<Walker>& walke
          {
             for(int iwalk=beginwin[iwin]; iwalk<beginwin[iwin+1]; iwalk++) 
             {
-               DoWangLandau(model,walkerpool[iwalk],NChunk);                  // Do the steps using Wang-Landau algorithm
-               totalstep += NChunk;
+               DoWangLandau(model,walkerpool[iwalk],NChunkDo);                  // Do the steps using Wang-Landau algorithm
+               totalstep += NChunkDo;
             }
          }
          // adjust walls
@@ -762,6 +763,7 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
 {
    //bool verbose = (this->verbose_debug) && (this->verbose) && (mp_window.pool.iproc==0);
    const int NWalker = walkerpool.size();
+   long NChunkDo = NChunk*walkerpool[0].now.V;
    if(verbose) std::cout << "wlgamma_start = " << wlgamma_start << std::endl;
    for(int iwalk=0; iwalk<NWalker; iwalk++)
    {
@@ -796,8 +798,8 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
       }
       // Sampling
       for(int iwalk=0; iwalk<NWalker; iwalk++)
-         DoWangLandau(model,walkerpool[iwalk],NChunk,measure);
-      istep += NChunk;
+         DoWangLandau(model,walkerpool[iwalk],NChunkDo,measure);
+      istep += NChunkDo;
       // Analysis
       measure.write();
       double WLQ = DoAnalyzeMPI(walkerpool,global_walker);

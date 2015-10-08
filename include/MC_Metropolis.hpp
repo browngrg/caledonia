@@ -25,7 +25,7 @@ public:
    float kTmin,kTmax;          // The temperature range
    std::vector<float> kTlist;  // Number of different temperature
 
-   long NStep;                 // Number of steps to take between measurements to minimize correlations
+   long NStep;                 // Number of steps (MCSS) to take between measurements to minimize correlations
    long NMeas;                 // Number of measurements to take
    long NTherm;                // Number of measurement blocks before begin averaging
    long NExchg;                // Number of mesurements blocks between replica exchange attempts
@@ -138,10 +138,11 @@ void MC_Metropolis::DoNStep(long NStep, Hamiltonian& hamilton, MCWalker& walker)
 template<typename Hamiltonian, typename MCWalker, typename MeasureObj>
 void MC_Metropolis::DoSample(Hamiltonian& hamilton, std::vector<MCWalker>& walker, MeasureObj& measure_obj)
 {
+   int NSpin = walker[0].now.V;
    // Do sampling
    for(int iwalk=0; iwalk<walker.size(); iwalk++)
    {
-      walker[iwalk].imcs = -NTherm*NStep;
+      walker[iwalk].imcs = -NTherm*NStep*NSpin;
       walker[iwalk].MCSS = static_cast<double>(walker[iwalk].imcs)/static_cast<double>(walker[iwalk].now.V);
    }
    long NMeasTot = NMeas + NTherm;
@@ -149,7 +150,7 @@ void MC_Metropolis::DoSample(Hamiltonian& hamilton, std::vector<MCWalker>& walke
    for(long imeas=0; imeas<NMeasTot && !at_wall_limit; imeas++)
    {
       for(int iwalk=0; iwalk<walker.size(); iwalk++)
-         this->DoNStep(NStep,hamilton,walker[iwalk]);
+         this->DoNStep(NSpin*NStep,hamilton,walker[iwalk]);
       bool at_equilibrium = (imeas>=NTherm);
       for(int iwalk=0; iwalk<walker.size(); iwalk++)
       {
