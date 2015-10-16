@@ -54,7 +54,7 @@ void WL_Latgas(int argc, char* argv[])
    options.add_option( "numwin",  "number of windows",                     ' ', &(wanglandau.NWindow));
    options.add_option( "numwalk", "number of walkers per window",          ' ', &(wanglandau.NWalkPerProcess));
    options.add_option( "overlap", "fractional overlap of windows",         ' ', &(wanglandau.fwinover));
-   options.add_option( "nchunk",  "number of steps per test",              ' ', &(wanglandau.NChunk));
+   options.add_option( "nstep",   "number of steps per test",              ' ', &(wanglandau.NStep));
    options.add_option( "Q",        "target convergence factor",            ' ', &(wanglandau.Qquit));
    options.add_option( "maxupdate","maximum number of iterations",         ' ', &(wanglandau.MaxUpdate));
    options.add_option( "dosinterp","linear interpolation of dos",          ' ', &(wanglandau.LinearInterp));

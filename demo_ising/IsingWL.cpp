@@ -49,7 +49,7 @@ void DoIt(int& argc, char* argv[])
    wanglandau.NWindow = 1;
    wanglandau.NWalkPerProcess = 5;
    wanglandau.fwinover = 0.75;
-   wanglandau.NChunk = 1000000;
+   wanglandau.NStep = 1000000;
    wanglandau.MaxUpdate = 16;
    wanglandau.wleta = 0;
    wanglandau.wlgamma_start = 1;
@@ -60,7 +60,7 @@ void DoIt(int& argc, char* argv[])
    options.add_option( "numwin",  "number of windows",              ' ', &(wanglandau.NWindow));
    options.add_option( "numwalk", "number of walkers per window",   ' ', &(wanglandau.NWalkPerProcess));
    options.add_option( "overlap", "fractional overlap of windows",  ' ', &(wanglandau.fwinover));
-   options.add_option( "nchunk",  "number of steps per iteration",  ' ', &(wanglandau.NChunk));
+   options.add_option( "nstep",   "number of steps per iteration",  ' ', &(wanglandau.NStep));
    options.add_option( "maxupdate","maximum number of iterations",  ' ', &(wanglandau.MaxUpdate));
    options.add_option( "dosinterp","linear interpolation of dos",   ' ', &(wanglandau.LinearInterp));
    options.add_option( "wleta",    "weighting between WL and ITTM", ' ', &(wanglandau.wleta));
