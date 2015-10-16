@@ -8,6 +8,8 @@
 #include<mpi.h>
 #endif
 
+#include"MPI_Struct.hpp"
+
 
 // Break a pool of MPI processes into Gangs that work together
 struct MPI_Gang
