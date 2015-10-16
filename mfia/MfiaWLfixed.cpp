@@ -48,7 +48,7 @@ void DoIt(int& argc, char* argv[])
    wanglandau.MaxUpdate = 15;
    wanglandau.NWindow = 1;
    options.add_option( "numwalk", "number of walkers per window",   ' ', &(wanglandau.NWalkPerProcess));
-   options.add_option( "nchunk",  "number of steps per iteration",  ' ', &(wanglandau.NChunk));
+   options.add_option( "nstep",   "number of steps per iteration",  ' ', &(wanglandau.NStep));
    options.add_option( "maxupdate","maximum number of iterations",  ' ', &(wanglandau.MaxUpdate));
    options.add_option( "wleta",    "weighting between WL and ITTM", ' ', &(wanglandau.wleta));
    options.add_option( "wlgamma",  "starting value of WL parameter",' ', &(wanglandau.wlgamma_start));
