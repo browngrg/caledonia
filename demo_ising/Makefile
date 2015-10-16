@@ -72,7 +72,7 @@ LIBFLAGS     = $(FFTW_LIB) $(MPI_LIB) $(BLAS_LIB)
 #LIBFLAGS     = -pg
 
 # Default rule, it must come first
-all: WangLandau.exe
+all: IsingWL.exe
 
 # General purpose implicit suffix rules
 #============================================================
