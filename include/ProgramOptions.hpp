@@ -81,6 +81,7 @@ class ProgramOptions
 public:
    ProgramOptions(std::string name, std::string purpose="");
    ~ProgramOptions();
+   void parse_command_line2(int argc, char* argv[]);
    void parse_command_line(int argc, char* argv[]);
    void read(std::istream& fin);
    void write();
@@ -567,6 +568,49 @@ void ProgramOptions::write()
          case POREC::t_string: fout <<   _var_string[ option[i].indx_type ] ; break;
       }
       fout << std::endl;
+   }
+}
+
+
+void ProgramOptions::parse_command_line2(int argc, char* argv[])
+{
+   // look for input file
+   for(int iarg=1; iarg<argc; iarg++)
+   {
+      std::string arg(argv[iarg]);
+      size_t strp = arg.find("--input=");
+      if( strp!=std::string::npos )
+      {
+         strp += 7;
+         strcpy(_fname_in,argv[iarg]+strp);
+      }
+      if( strcmp("-i",argv[iarg])==0 )
+      {
+         strcpy(_fname_in,argv[iarg+1]);
+      } 
+   }
+   std::string fname = get_value<std::string>("input");
+   std::ifstream fin(fname.c_str());
+   read(fin);
+   // parse command line
+   for(int iarg=1; iarg<argc; iarg++)
+   {
+      std::string arg(argv[iarg]);
+      if( arg.size()>2 && arg[0]=='-' )
+      {
+         if( arg[1]=='-' )
+         {
+            size_t strp = arg.find("=");
+            std::string name = arg.substr(2,strp-2);
+            set_value(name,arg.substr(strp+1));
+         }
+         else
+         {
+            int iopt = char_option[arg[1]];
+            if( iopt>=0 && iopt<128 )
+            set_value(option[iopt].name,argv[iarg+1]);
+         }
+      }
    }
 }
 
