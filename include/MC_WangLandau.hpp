@@ -9,6 +9,7 @@
 #include "MPI_Gang.hpp"
 #include "Random.hpp"
 #include "Null_Measure.hpp"
+#include "ProcessTime.hpp"
 
 #include <cstdlib>
 #include <vector>
@@ -31,6 +32,18 @@
 #include"MPITypeTraits.hpp"
 #endif
 
+
+// Return the standard deviation of a vector
+double stddev(const std::vector<double>& wlqsave)
+{
+    double N = static_cast<double>(wlqsave.size());
+    double mom1 = 0;
+    double mom2 = 0;
+    for(int i=0; i<wlqsave.size(); i++) { mom1+=wlqsave[i]; mom2+=wlqsave[i]*wlqsave[i]; }
+    double mean = mom1/N;
+    double var = mom2/N-mean*mean;
+    return std::sqrt(var);
+}
 
 
 class MC_WangLandau
@@ -127,6 +140,11 @@ public:
 
    double kTlo, kThi;                  // Range of output temperatures for WriteWLBoltzmann
 
+   ProcessTime ptime;
+   double wall_limit;                  // Longest time to run (in seconds)
+   bool   at_wall_limit;
+
+
    // Windowing information
    int NWindow;                           // Total number of windows
    int NWalkPerProcess;                   // On each node
@@ -185,6 +203,8 @@ MC_WangLandau::MC_WangLandau()
    fwinover = 0.5;                                         // fractional overlap, maximal for M/(M+1)
    kTlo     = 0.5;
    kThi     = 5.0;
+   at_wall_limit = false;
+   wall_limit = 24*60*60;
 }
 
 
@@ -788,8 +808,12 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
    unsigned long int istep = 0;
    unsigned long int iloop = 0;
    unsigned long int iupdate = 0;
+   std::vector<double> wlqsave(20);
+   long iwlq = 0;
    WLWalker global_walker;
-   while( iupdate<MaxUpdate )
+   ptime.start();
+   at_wall_limit = false;
+   while( iupdate<MaxUpdate && !at_wall_limit )
    {
       if(verbose && iupdate>5) 
       {
@@ -803,6 +827,9 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
       // Analysis
       measure.write();
       double WLQ = DoAnalyzeMPI(walkerpool,global_walker);
+      wlqsave[iwlq%wlqsave.size()] = WLQ;
+      double wlqrms = (iwlq>wlqsave.size())? stddev(wlqsave) : 2*Qquit;
+      iwlq++;
       global_walker.wlgamma = walkerpool[0].wlgamma;
       WriteWLDOS(global_walker,iupdate);
       WriteWLBoltzmann(global_walker,iupdate);
@@ -836,10 +863,10 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
       if( mp_window.pool.iproc==0 )
       {
          double psecs = static_cast<double>(clock())/static_cast<double>(CLOCKS_PER_SEC);
-         std::cout << "loop= " << iloop << " level=" << iupdate << " WLgamma=" << walkerpool[0].wlgamma << " WLQ=" << WLQ << " istep=" << istep << " visit=" << fvisit << " time = " << psecs << " secs" << std::endl;
+         std::cout << "loop= " << iloop << " level=" << iupdate << " WLgamma=" << walkerpool[0].wlgamma << " WLQ=" << WLQ << " rms(WLQ)=" << wlqrms << " istep=" << istep << " visit=" << fvisit << " time = " << psecs << " secs" << std::endl;
       }
       // Work on convergence
-      if( global_walker.wlgamma>0 && WLQ<Qquit && allvisit   )
+      if( global_walker.wlgamma>0 && ( WLQ<Qquit || wlqrms<Qquit )  && allvisit   )
       {
          for(int iwalk=0; iwalk<NWalker; iwalk++)
          {
@@ -853,6 +880,8 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
          WLQold = 0;
          for(int iwalk=0; iwalk<NWalker; iwalk++)
                std::fill(walkerpool[iwalk].h.begin(),walkerpool[iwalk].h.end(),0);
+         for(int i=0; i<wlqsave.size(); i++) wlqsave[i]=0;
+         iwlq = 0;
          istep = 0;
          iupdate++;
       }
@@ -889,6 +918,7 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
          for(int iwalk=0; iwalk<NWalker; iwalk++)
                std::fill(walkerpool[iwalk].h.begin(),walkerpool[iwalk].h.end(),0);
       }
+      at_wall_limit = (ptime.elapsed()>wall_limit);
       WLQold = WLQ;
       fvisit_old = fvisit;
       iloop++;
