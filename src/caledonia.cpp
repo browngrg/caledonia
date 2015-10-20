@@ -33,28 +33,7 @@ void SimulationDriver(ProgramOptions& options, int& argc, char* argv[])
 
    // Construct the sampling object
    MC_WangLandau wanglandau;
-   wanglandau.Elo = wanglandau.Ehi = 0;
-   wanglandau.Ebin = 1;
-   wanglandau.NWindow = 1;
-   wanglandau.NWalkPerProcess = 5;
-   wanglandau.fwinover = 0.75;
-   wanglandau.NStep = 1000000;
-   wanglandau.MaxUpdate = 16;
-   wanglandau.wleta = 0;
-   wanglandau.wlgamma_start = 1;
-   wanglandau.Qquit = 0.10;
-   options.add_option( "Elo",     "lower side of energy window",    ' ', &(wanglandau.Elo));
-   options.add_option( "Ehi",     "lower side of energy window",    ' ', &(wanglandau.Ehi));
-   options.add_option( "Ebin",    "width of energy bins",           ' ', &(wanglandau.Ebin));
-   options.add_option( "numwin",  "number of windows",              ' ', &(wanglandau.NWindow));
-   options.add_option( "numwalk", "number of walkers per window",   ' ', &(wanglandau.NWalkPerProcess));
-   options.add_option( "overlap", "fractional overlap of windows",  ' ', &(wanglandau.fwinover));
-   options.add_option( "nstep",   "number of steps per iteration",  ' ', &(wanglandau.NStep));
-   options.add_option( "maxupdate","maximum number of iterations",  ' ', &(wanglandau.MaxUpdate));
-   options.add_option( "dosinterp","linear interpolation of dos",   ' ', &(wanglandau.LinearInterp));
-   options.add_option( "wleta",    "weighting between WL and ITTM", ' ', &(wanglandau.wleta));
-   options.add_option( "wlgamma",  "starting value of WL parameter",' ', &(wanglandau.wlgamma_start));
-   options.add_option( "Q",        "target convergence factor",     ' ', &(wanglandau.Qquit));
+   wanglandau.add_options(options);
 
    // Local options
    char lng_est_fn[512]; lng_est_fn[0]=0;

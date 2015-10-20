@@ -59,6 +59,8 @@ public:
    template<typename Walker>
    void init_pool(std::vector<Walker>& pool);
 
+   template<typename OPTIONS> void add_options(OPTIONS& options);
+
    bool verbose;                              // output level
 
    enum { latgas, ising, heisenberg } stype;  // Describes the order parameter
@@ -207,6 +209,32 @@ MC_WangLandau::MC_WangLandau()
    wall_limit = 24*60*60;
 }
 
+template<typename OPTIONS>
+void MC_WangLandau::add_options(OPTIONS& options)
+{
+   this->Elo = this->Ehi = 0;
+   this->Ebin = 1;
+   this->NWindow = 1;
+   this->NWalkPerProcess = 5;
+   this->fwinover = 0.75;
+   this->NStep = 1000000;
+   this->MaxUpdate = 16;
+   this->wleta = 0;
+   this->wlgamma_start = 1;
+   this->Qquit = 0.10;
+   options.add_option( "Elo",     "lower side of energy window",    ' ', &(this->Elo));
+   options.add_option( "Ehi",     "lower side of energy window",    ' ', &(this->Ehi));
+   options.add_option( "Ebin",    "width of energy bins",           ' ', &(this->Ebin));
+   options.add_option( "numwin",  "number of windows",              ' ', &(this->NWindow));
+   options.add_option( "numwalk", "number of walkers per window",   ' ', &(this->NWalkPerProcess));
+   options.add_option( "overlap", "fractional overlap of windows",  ' ', &(this->fwinover));
+   options.add_option( "nstep",   "number of steps per iteration",  ' ', &(this->NStep));
+   options.add_option( "maxupdate","maximum number of iterations",  ' ', &(this->MaxUpdate));
+   options.add_option( "dosinterp","linear interpolation of dos",   ' ', &(this->LinearInterp));
+   options.add_option( "wleta",    "weighting between WL and ITTM", ' ', &(this->wleta));
+   options.add_option( "wlgamma",  "starting value of WL parameter",' ', &(this->wlgamma_start));
+   options.add_option( "Q",        "target convergence factor",     ' ', &(this->Qquit));
+}
 
 MC_WangLandau::~MC_WangLandau()
 {
