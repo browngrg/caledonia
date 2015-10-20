@@ -47,12 +47,13 @@ void DoIt(int& argc, char* argv[])
    wanglandau.Qquit = 0.05;
    wanglandau.MaxUpdate = 15;
    wanglandau.NWindow = 1;
-   options.add_option( "numwalk", "number of walkers per window",   ' ', &(wanglandau.NWalkPerProcess));
-   options.add_option( "nstep",   "number of steps per iteration",  ' ', &(wanglandau.NStep));
-   options.add_option( "maxupdate","maximum number of iterations",  ' ', &(wanglandau.MaxUpdate));
-   options.add_option( "wleta",    "weighting between WL and ITTM", ' ', &(wanglandau.wleta));
-   options.add_option( "wlgamma",  "starting value of WL parameter",' ', &(wanglandau.wlgamma_start));
-   options.add_option( "Q",        "target convergence factor",     ' ', &(wanglandau.Qquit));
+   options.add_option( "numwalk",   "number of walkers per window",   ' ', &(wanglandau.NWalkPerProcess));
+   options.add_option( "nstep",     "number of steps per iteration",  ' ', &(wanglandau.NStep));
+   options.add_option( "maxupdate", "maximum number of iterations",   ' ', &(wanglandau.MaxUpdate));
+   options.add_option( "wleta",     "weighting between WL and ITTM",  ' ', &(wanglandau.wleta));
+   options.add_option( "wlgamma",   "starting value of WL parameter", ' ', &(wanglandau.wlgamma_start));
+   options.add_option( "Q",         "target convergence factor",      ' ', &(wanglandau.Qquit));
+   options.add_option( "wall_limit","wall_limit limit for run",       ' ', &(wanglandau.wall_limit));
    wanglandau.LinearInterp = 0;
 
    // Local options
