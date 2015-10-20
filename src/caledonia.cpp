@@ -3,7 +3,7 @@
 
 #include"MC_WangLandau.hpp"
 #include"WL_Walker.hpp"
-#include"Mfia_Hamiltonian.hpp"
+#include"../mfia/Mfia_Hamiltonian.hpp"
 #include"MPI_Struct.hpp"
 #include"Random.hpp"
 #include"EMX_Measure.hpp"
