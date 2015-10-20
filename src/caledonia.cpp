@@ -15,7 +15,7 @@
 #include<algorithm>
 
 
-void DoIt(int& argc, char* argv[])
+void SimulationDriver(ProgramOptions& options, int& argc, char* argv[])
 {
 
    //  Get basic MPI information
@@ -25,22 +25,11 @@ void DoIt(int& argc, char* argv[])
    MPI_Comm_rank(world.comm,&world.iproc);
    MPI_Comm_size(world.comm,&world.nproc);
 #  endif
-
-   using namespace std;
-   ProgramOptions options("Mfia6","Wang-Landau Sampling of Ising model with LR term.");
  
    // Construct a hamiltonian object 
    typedef Mfia_Hamiltonian HAMILTONIAN;
    HAMILTONIAN hamilton;
-   hamilton.D     = 2;
-   hamilton.L     = 32;
-   hamilton.JSIGN = +1;     // +1 = Ferromagnet, -1 = Antiferromagnet
-   hamilton.H     = 0;      // Applied field
-   hamilton.A     = 0;
-   options.add_option("dim",    "dimension of spin lattice",     'D', &(hamilton.D) );
-   options.add_option("length", "extent of lattice in each dim", 'L', &(hamilton.L) );
-   options.add_option("jsign",  "sign in front of exchange",     'J', &(hamilton.JSIGN) );
-   options.add_option("H",      "magnitude of magnetic field",   'H', &(hamilton.H) );
+   hamilton.add_options(options);
 
    // Construct the sampling object
    MC_WangLandau wanglandau;
@@ -77,10 +66,10 @@ void DoIt(int& argc, char* argv[])
    bool verbose = options.get_value<bool>("verbose") && (world.iproc==0);
 
    // Re-initialize objects
-   if(verbose) cout << __FILE__ << ":" << __LINE__ << " Reinitialize begun" << endl;
+   if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " Reinitialize begun" << std::endl;
    hamilton.init(verbose);
    const int NGrid = hamilton.V;
-   if(verbose) cout << __FILE__ << ":" << __LINE__ << " NGrid=" << NGrid << endl;
+   if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " NGrid=" << NGrid << std::endl;
    if( wanglandau.Elo>=wanglandau.Ehi )
    {
       // If energy range not set, span the entire range
@@ -102,9 +91,9 @@ void DoIt(int& argc, char* argv[])
    bool rng_failed = RNGTestMoments(wanglandau.urng,rng_output,std::cout);
    if( rng_failed )
    {
-      cout << __FILE__ << ":" << __LINE__ << "Problem detected with random number generator (returns 1?)" << endl;
+      std::cout << __FILE__ << ":" << __LINE__ << "Problem detected with random number generator (returns 1?)" << std::endl;
    }
-   if(verbose) cout << __FILE__ << ":" << __LINE__ << " Random number generator created" << endl;
+   if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " Random number generator created" << std::endl;
 
    // The measurement object
    // EMX_Measure measure_obj;
@@ -172,7 +161,7 @@ void DoIt(int& argc, char* argv[])
    // Construct a representation of the model
    // This includes the "microscopic" configuration sigma_i
    // and the macroscopic quantities like magnetization and energy
-   if(verbose) cout << __FILE__ << ":" << __LINE__ << " Create one walker" << endl;
+   if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " Create one walker" << std::endl;
    typedef WL_Walker<HAMILTONIAN::Config,HAMILTONIAN::Observables> Walker;
    std::vector<Walker> walkerpool(1);
    walkerpool[0].sigma.resize(NGrid);
@@ -213,12 +202,18 @@ int main(int argc, char* argv[])
       std::cout << "process id = " << pid << std::endl;
    }
 
-
-
 #  ifdef USE_MPI
    MPI_Init(&argc,&argv);
 #  endif
-   DoIt(argc,argv);
+
+   ProgramOptions options("caledonia","Monte Carlo simulations");
+   char model_name[128] = "ising";
+   char sim_name[128] = "wanglandau";
+   options.add_option("model","Hamiltonian type", ' ', model_name);
+   options.add_option("sim",  "Monte Carlo simulation type", ' ', sim_name);
+   options.parse_command_line2(argc,argv);
+   SimulationDriver(options,argc,argv);
+
 #  ifdef USE_MPI
    MPI_Finalize();
 #  endif

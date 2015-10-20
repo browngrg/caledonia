@@ -123,7 +123,9 @@ public:
    }
 
    std::string header() const;
-    
+   
+   template<typename OPTIONS> void add_options(OPTIONS& options);
+
    void init(bool verbose=false);
     
 public:
@@ -175,6 +177,21 @@ Mfia_Hamiltonian::Mfia_Hamiltonian(int DIM, int Lval, bool AFM)
    use_walker_H = false;
    op_constrained = false;
    this->init();
+}
+
+template<typename OPTIONS>
+void Mfia_Hamiltonian::add_options(OPTIONS& options)
+{
+   this->D     = 2;
+   this->L     = 32;
+   this->JSIGN = +1;     // +1 = Ferromagnet, -1 = Antiferromagnet
+   this->H     = 0;      // Applied field
+   this->A     = 0;
+   options.add_option("dim",    "dimension of spin lattice",     'D', &(this->D) );
+   options.add_option("length", "extent of lattice in each dim", 'L', &(this->L) );
+   options.add_option("jsign",  "sign in front of exchange",     'J', &(this->JSIGN) );
+   options.add_option("H",      "magnitude of magnetic field",   'H', &(this->H) );
+   options.add_option("A",      "mean-field interaction",        'A', &(this->A) );
 }
 
 
