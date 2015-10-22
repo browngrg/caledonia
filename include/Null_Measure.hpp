@@ -33,6 +33,8 @@ public:
    // Write current statistics (could be a check-point)
    void write();
 
+   template<typename OBJ> void init(const OBJ& obj) {}
+
 private:
 
 };

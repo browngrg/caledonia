@@ -46,6 +46,14 @@ public:
 
    void init(float Emin, float Emax, float Ebin);
 
+   template<typename SIMULATION>
+   void init(const SIMULATION& simulation)
+   {
+      // This is for when measure_obj is EMX_Measure
+      this->init(simulation.Elo,simulation.Ehi,simulation.Ebin);
+      this->mp = simulation.mp_window.pool; 
+   }
+
 private:
 
    int bin(float E) const { int ibin=static_cast<int>((E-Elo)/Ebin); if(ibin<0) ibin=0; if(ibin>=NBinE) ibin=NBinE-1; return ibin; }

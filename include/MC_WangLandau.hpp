@@ -59,6 +59,9 @@ public:
    template<typename Walker>
    void init_pool(std::vector<Walker>& pool);
 
+   template<typename HAMILTON, typename WALKER> 
+   void init(HAMILTON& hamilton, std::vector<WALKER>& pool, bool verbose=false);
+
    template<typename OPTIONS> void add_options(OPTIONS& options);
 
    bool verbose;                              // output level
@@ -141,6 +144,8 @@ public:
    bool output_configs;
 
    double kTlo, kThi;                  // Range of output temperatures for WriteWLBoltzmann
+   
+   char lng_est_fn[512]; 
 
    ProcessTime ptime;
    double wall_limit;                  // Longest time to run (in seconds)
@@ -207,6 +212,7 @@ MC_WangLandau::MC_WangLandau()
    kThi     = 5.0;
    at_wall_limit = false;
    wall_limit = 24*60*60;
+   lng_est_fn[0]=0;
 }
 
 template<typename OPTIONS>
@@ -217,11 +223,12 @@ void MC_WangLandau::add_options(OPTIONS& options)
    this->NWindow = 1;
    this->NWalkPerProcess = 5;
    this->fwinover = 0.75;
-   this->NStep = 1000000;
+   this->NStep = 10000;
    this->MaxUpdate = 16;
    this->wleta = 0;
    this->wlgamma_start = 1;
    this->Qquit = 0.10;
+   lng_est_fn[0]=0;
    options.add_option( "Elo",     "lower side of energy window",    ' ', &(this->Elo));
    options.add_option( "Ehi",     "lower side of energy window",    ' ', &(this->Ehi));
    options.add_option( "Ebin",    "width of energy bins",           ' ', &(this->Ebin));
@@ -234,6 +241,7 @@ void MC_WangLandau::add_options(OPTIONS& options)
    options.add_option( "wleta",    "weighting between WL and ITTM", ' ', &(this->wleta));
    options.add_option( "wlgamma",  "starting value of WL parameter",' ', &(this->wlgamma_start));
    options.add_option( "Q",        "target convergence factor",     ' ', &(this->Qquit));
+   options.add_option( "dos",      "dos file to use in sampling",   ' ', lng_est_fn);
 }
 
 MC_WangLandau::~MC_WangLandau()
@@ -241,6 +249,80 @@ MC_WangLandau::~MC_WangLandau()
 ;
 }
 
+template<typename HAMILTON, typename WALKER> 
+void MC_WangLandau::init(HAMILTON& hamilton, std::vector<WALKER>& walkerpool, bool _verbose)
+{
+   verbose = _verbose;
+   this->mp_window.pool = MPI_Struct::world();
+   hamilton.calc_observable(walkerpool[0].sigma,walkerpool[0].now);
+   if( this->Elo>=this->Ehi )
+   {
+      Elo = walkerpool[0].now.E;
+      Ehi = 0;
+   }
+   // Read in the density of states
+   std::vector<double> energy,lng_est;
+   if( lng_est_fn[0]!=0 )
+   {
+      double E,lng;
+      std::string buff;
+      std::ifstream fin(lng_est_fn);
+      while( fin && fin.is_open() && !fin.eof() )
+      {
+         std::getline(fin,buff);
+         if( buff.size()>0 && buff[0]!='#' )
+         {
+            sscanf( buff.c_str(),"%lf %lf",&E,&lng);
+            energy.push_back(E);
+            lng_est.push_back(lng);
+         }
+      }
+   }
+   if( energy.size()==0 )
+   {
+      const int npt = 100;
+      energy.resize(npt);
+      lng_est.resize(npt);
+      double de = (this->Ehi-this->Elo)/static_cast<double>(npt-1);
+      for(int i=0; i<npt; i++)
+      {
+         energy[i] = this->Elo + i*de;
+         lng_est[i] = 0;
+      }
+   }
+   if( this->Elo<std::numeric_limits<double>::max() )
+   {
+      int i=0; 
+      while( i<energy.size() && energy[i]<this->Elo ) i++;
+      if( i<energy.size() )
+      { 
+         if(verbose) std::cout << "Elo = " << this->Elo << std::endl;
+         if(verbose) std::cout << "Trimming energy from " << energy.front() << " with " << energy.size() << " elements" << std::endl;
+         energy.erase(energy.begin(),energy.begin()+i);
+         lng_est.erase(lng_est.begin(),lng_est.begin()+i);
+         energy[0] = this->Elo;
+         if(verbose) std::cout << "To energy from " << energy.front() << " with " << energy.size() << " elements" << std::endl;
+      }
+   }
+   if( this->Ehi>-std::numeric_limits<double>::max() )
+   {
+      int i=0; 
+      while( i<energy.size() && energy[i]<this->Ehi ) i++;
+      if( i<energy.size() )
+      { 
+         if(verbose) std::cout << "Ehi = " << this->Ehi << std::endl;
+         if(verbose) std::cout << "Trimming energy ending at " << energy.back() << " with " << energy.size() << " elements" << std::endl;
+         energy.erase(energy.begin()+i,energy.end());
+         lng_est.erase(lng_est.begin()+i,lng_est.end());
+         energy[i-1] = this->Ehi;
+         if(verbose) std::cout << "To energy ending at " << energy.back() << " with " << energy.size() << " elements" << std::endl;
+      }
+   }
+   this->partition_windows(energy,lng_est);
+   this->init_pool(walkerpool);   
+   for(int iwalk=0; iwalk<walkerpool.size(); iwalk++)
+      walkerpool[iwalk].set_fixed(energy,lng_est);
+}
 
 void MC_WangLandau::copy(const MC_WangLandau& orig)
 {
@@ -856,7 +938,7 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
       measure.write();
       double WLQ = DoAnalyzeMPI(walkerpool,global_walker);
       wlqsave[iwlq%wlqsave.size()] = WLQ;
-      double wlqrms = (iwlq>wlqsave.size())? stddev(wlqsave) : 2*Qquit;
+      double wlqsdev = (iwlq>wlqsave.size())? stddev(wlqsave) : 2*Qquit;
       iwlq++;
       global_walker.wlgamma = walkerpool[0].wlgamma;
       WriteWLDOS(global_walker,iupdate);
@@ -891,10 +973,10 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
       if( mp_window.pool.iproc==0 )
       {
          double psecs = static_cast<double>(clock())/static_cast<double>(CLOCKS_PER_SEC);
-         std::cout << "loop= " << iloop << " level=" << iupdate << " WLgamma=" << walkerpool[0].wlgamma << " WLQ=" << WLQ << " rms(WLQ)=" << wlqrms << " istep=" << istep << " visit=" << fvisit << " time = " << psecs << " secs" << std::endl;
+         std::cout << "loop= " << iloop << " level=" << iupdate << " WLgamma=" << walkerpool[0].wlgamma << " WLQ=" << WLQ << " sdev(WLQ)=" << wlqsdev << " istep=" << istep << " visit=" << fvisit << " time = " << psecs << " secs" << std::endl;
       }
       // Work on convergence
-      if( global_walker.wlgamma>0 && ( WLQ<Qquit || wlqrms<Qquit )  && allvisit   )
+      if( global_walker.wlgamma>0 && ( WLQ<Qquit || wlqsdev<Qquit )  && allvisit   )
       {
          for(int iwalk=0; iwalk<NWalker; iwalk++)
          {
