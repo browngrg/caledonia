@@ -155,8 +155,8 @@ public:
 public:
 
    // Create mixed ferromagnetic / antiferromagnetic configuration
+   void initial(Config& sigma) const;
    void initial_mixed(Config& sigma) const;
-
    void initial_ferro(Config& sigma) const;
 
 public:
@@ -459,6 +459,12 @@ void Mfia_Hamiltonian::spin_flip(MCWalker& walker, URNG& urng)
          std::cout << "full_calc energy = " << walker.now.E << std::endl;
       } 
    }
+}
+
+
+void Mfia_Hamiltonian::initial(Mfia_Hamiltonian::Config& sigma) const
+{
+   this->initial_mixed(sigma);
 }
 
 
