@@ -4,6 +4,7 @@
 #include"MC_WangLandau.hpp"
 #include"WL_Walker.hpp"
 #include"../mfia/Mfia_Hamiltonian.hpp"
+#include"../ehmodel/EHModel_Hamiltonian.hpp"
 #include"MPI_Struct.hpp"
 #include"Random.hpp"
 #include"EMX_Measure.hpp"
@@ -15,7 +16,8 @@
 #include<algorithm>
 
 
-void SimulationDriver(ProgramOptions& options, int& argc, char* argv[])
+template<typename HAMILTON, typename MEASURE>
+void WangLandauDriver(ProgramOptions& options, int& argc, char* argv[])
 {
 
    //  Get basic MPI information
@@ -26,139 +28,51 @@ void SimulationDriver(ProgramOptions& options, int& argc, char* argv[])
    MPI_Comm_size(world.comm,&world.nproc);
 #  endif
  
+   bool verbose = options.get_value<bool>("verbose") && (world.iproc==0);
+   if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " Construction objects" << std::endl;
+
    // Construct a hamiltonian object 
-   typedef Mfia_Hamiltonian HAMILTONIAN;
-   HAMILTONIAN hamilton;
+   HAMILTON hamilton;
    hamilton.add_options(options);
 
    // Construct the sampling object
-   MC_WangLandau wanglandau;
-   wanglandau.add_options(options);
+   MC_WangLandau simulation;
+   simulation.add_options(options);
 
-   // Local options
-   char lng_est_fn[512]; lng_est_fn[0]=0;
-   options.add_option( "dos",   "dos file to use in sampling",      ' ', lng_est_fn);
-
-   // Get parameters
-   options.parse_command_line(argc,argv);
-   if( options.get_value<bool>("help") ) return;
-   bool verbose = options.get_value<bool>("verbose") && (world.iproc==0);
-
-   // Re-initialize objects
-   if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " Reinitialize begun" << std::endl;
-   hamilton.init(verbose);
-   const int NGrid = hamilton.V;
-   if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " NGrid=" << NGrid << std::endl;
-   if( wanglandau.Elo>=wanglandau.Ehi )
-   {
-      // If energy range not set, span the entire range
-      wanglandau.Elo = -hamilton.D*hamilton.V-hamilton.H*hamilton.V;
-      wanglandau.Ehi = std::max( static_cast<double>(hamilton.D*hamilton.V), hamilton.H*hamilton.V );
-      if( hamilton.H==0 ) 
-      {
-         // if H==0, center bins on allowed energu values
-         wanglandau.Elo -= hamilton.D;
-         wanglandau.Ehi += hamilton.D;
-      }
-   }
-   // If H==0, then only DeltaE = 4 is possible
-   if( hamilton.H==0 ) wanglandau.Ebin = 2*hamilton.D;
-
-   // seed the random number geneator
-   wanglandau.urng.seed( ParallelSeed(SeedFromClock()) );
-   bool rng_output = false;
-   bool rng_failed = RNGTestMoments(wanglandau.urng,rng_output,std::cout);
-   if( rng_failed )
-   {
-      std::cout << __FILE__ << ":" << __LINE__ << "Problem detected with random number generator (returns 1?)" << std::endl;
-   }
-   if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " Random number generator created" << std::endl;
+   typedef WL_Walker<typename HAMILTON::Config,typename HAMILTON::Observables> Walker;
+   std::vector<Walker> walkerpool(1);
 
    // The measurement object
    // EMX_Measure measure_obj;
-   Null_Measure measure_obj;
+   MEASURE measure_obj;
 
-   // Read in the density of state
-   std::vector<double> energy,lng_est;
-   if( lng_est_fn[0]!=0 )
-   {
-      double E,lng;
-      std::string buff;
-      std::ifstream fin(lng_est_fn);
-      while( fin && fin.is_open() && !fin.eof() )
-      {
-         std::getline(fin,buff);
-         if( buff.size()>0 && buff[0]!='#' )
-         {
-            sscanf( buff.c_str(),"%lf %lf",&E,&lng);
-            energy.push_back(E);
-            lng_est.push_back(lng);
-         }
-      }
-   }
-   if( energy.size()==0 )
-   {
-      const int npt = 100;
-      energy.resize(npt);
-      lng_est.resize(npt);
-      double de = (wanglandau.Ehi-wanglandau.Elo)/static_cast<double>(npt-1);
-      for(int i=0; i<npt; i++)
-      {
-         energy[i] = wanglandau.Elo + i*de;
-         lng_est[i] = 0;
-      }
-   }
-   if( wanglandau.Elo<std::numeric_limits<double>::max() )
-   {
-      int i=0; 
-      while( i<energy.size() && energy[i]<wanglandau.Elo ) i++;
-      if( i<energy.size() )
-      { 
-         if(verbose) std::cout << "Elo = " << wanglandau.Elo << std::endl;
-         if(verbose) std::cout << "Trimming energy from " << energy.front() << " with " << energy.size() << " elements" << std::endl;
-         energy.erase(energy.begin(),energy.begin()+i);
-         lng_est.erase(lng_est.begin(),lng_est.begin()+i);
-         energy[0] = wanglandau.Elo;
-         if(verbose) std::cout << "To energy from " << energy.front() << " with " << energy.size() << " elements" << std::endl;
-      }
-   }
-   if( wanglandau.Ehi>-std::numeric_limits<double>::max() )
-   {
-      int i=0; 
-      while( i<energy.size() && energy[i]<wanglandau.Ehi ) i++;
-      if( i<energy.size() )
-      { 
-         if(verbose) std::cout << "Ehi = " << wanglandau.Ehi << std::endl;
-         if(verbose) std::cout << "Trimming energy ending at " << energy.back() << " with " << energy.size() << " elements" << std::endl;
-         energy.erase(energy.begin()+i,energy.end());
-         lng_est.erase(lng_est.begin()+i,lng_est.end());
-         energy[i-1] = wanglandau.Ehi;
-         if(verbose) std::cout << "To energy ending at " << energy.back() << " with " << energy.size() << " elements" << std::endl;
-      }
-   }
+   // Get parameters
+   if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " Parsing parameters" << std::endl;
+   options.parse_command_line(argc,argv);
+   if( options.get_value<bool>("help") ) return;
+
+   // seed the random number geneator
+   if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " Creating random number generator" << std::endl;
+   simulation.urng.seed( ParallelSeed(SeedFromClock()) );
+   bool rng_output = false;
+   bool rng_failed = RNGTestMoments(simulation.urng,rng_output,std::cout);
+   if( false && rng_failed )
+      std::cout << __FILE__ << ":" << __LINE__ << "Problem detected with random number generator (returns 1?)" << std::endl;
+
+   // Initialize objects based on ProgramOptions
+   if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " Call Init routines" << std::endl;
+   hamilton.init(verbose);
+   hamilton.initial(walkerpool[0].sigma);
+   simulation.init(hamilton,walkerpool,verbose);
+   measure_obj.init(simulation);
 
    // Construct a representation of the model
    // This includes the "microscopic" configuration sigma_i
    // and the macroscopic quantities like magnetization and energy
-   if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " Create one walker" << std::endl;
-   typedef WL_Walker<HAMILTONIAN::Config,HAMILTONIAN::Observables> Walker;
-   std::vector<Walker> walkerpool(1);
-   walkerpool[0].sigma.resize(NGrid);
-   hamilton.initial_mixed(walkerpool[0].sigma);
-   hamilton.calc_observable(walkerpool[0].sigma,walkerpool[0].now);
-   wanglandau.verbose = options.get_value<bool>("verbose");
-   wanglandau.mp_window.pool = world;
-   wanglandau.partition_windows(energy,lng_est);
-   wanglandau.init_pool(walkerpool);   
-   for(int iwalk=0; iwalk<walkerpool.size(); iwalk++)
-      walkerpool[iwalk].set_fixed(energy,lng_est);
-#  if 0
-   // This is for when measure_obj is EMX_Measure
-   measure_obj.init(wanglandau.Elo,wanglandau.Ehi,wanglandau.Ebin);
-   measure_obj.mp_window = wanglandau.mp_window; 
-#  endif
-   wanglandau.DoConverge(hamilton,walkerpool,measure_obj);
+   if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " Beginning simulation" << std::endl;
+   simulation.DoConverge(hamilton,walkerpool,measure_obj);
 
+   if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " Saving options" << std::endl;
    options.write();
 }
 
@@ -181,8 +95,11 @@ int main(int argc, char* argv[])
       std::cout << "process id = " << pid << std::endl;
    }
 
+   //  Get basic MPI information
+   MPI_Struct world;
 #  ifdef USE_MPI
    MPI_Init(&argc,&argv);
+   world = MPI_Struct::world();
 #  endif
 
    ProgramOptions options("caledonia","Monte Carlo simulations");
@@ -191,7 +108,13 @@ int main(int argc, char* argv[])
    options.add_option("model","Hamiltonian type", ' ', model_name);
    options.add_option("sim",  "Monte Carlo simulation type", ' ', sim_name);
    options.parse_command_line2(argc,argv);
-   SimulationDriver(options,argc,argv);
+   if( strcmp(sim_name,"wanglandau")==0 )
+   {
+      if( strcmp(model_name,"ising")==0 )   {  WangLandauDriver<Mfia_Hamiltonian,EMX_Measure>(options,argc,argv); }
+      else if( strcmp(model_name,"ehmodel")==0 ) {  WangLandauDriver<EHModel_Hamiltonian,EMX_Measure>(options,argc,argv); }
+      else { if(world.iproc==0) std::cout << "model \"" << model_name << "\" not recognized for \"" << sim_name << "\"" << std::endl; }
+   }
+
 
 #  ifdef USE_MPI
    MPI_Finalize();
