@@ -30,8 +30,9 @@ public:
     double Mmag2;  
     double Mstag; // Staggered magnetization
     double V;     // Volume = Number of spins
+    double H;     // Applied magnetic field
 public:
-    Heisenberg_Observables() { E=0; X=0; E_N=E_K=E_D=E_H=0; V=0; } 
+    Heisenberg_Observables() { E=0; X=0; E_N=E_K=E_D=E_H=0; V=0; H=0; } 
     Heisenberg_Observables(const Heisenberg_Observables& w) { this->copy(w); }
     void operator=(const Heisenberg_Observables& w) { this->copy(w); }
     void copy(const Heisenberg_Observables& w)
@@ -43,6 +44,7 @@ public:
        E_H = w.E_H;
        X = w.X;
        M = w.M;
+       H = w.H;
        Mmag2 = w.Mmag2;
        Mstag = w.Mstag;
        V = w.V;
@@ -136,6 +138,7 @@ public:
 
    virtual void init(bool verbose=false);
 
+   void initial(Config& sigma) const;
    void initial_mixed(Config& sigma) const;
    void initial_ferro(Config& sigma) const;
    template<typename URNG> void initial_random(Config& sigma, URNG& urng) const;
@@ -198,6 +201,7 @@ void Heisenberg_Hamiltonian::init(bool verbose)
 void Heisenberg_Hamiltonian::calc_observable(Heisenberg_Hamiltonian::Config& sigma, Heisenberg_Observables& macro)
 {
    macro.V = nspin;
+   macro.H = H;
    double* S(&sigma[0]);            // Hiesenberg specific
    if( false )
    {
@@ -380,6 +384,10 @@ void Heisenberg_Hamiltonian::change(Heisenberg_Hamiltonian::Config& sigma, Heise
    }
 }
 
+void Heisenberg_Hamiltonian::initial(Heisenberg_Hamiltonian::Config& sigma) const
+{
+   this->initial_mixed(sigma);
+}
 
 void Heisenberg_Hamiltonian::initial_mixed(Heisenberg_Hamiltonian::Config& sigma) const
 {

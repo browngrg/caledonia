@@ -11,6 +11,7 @@
 #include"Heisenberg_Hamiltonian.hpp"
 
 #include<iostream>
+#include<fstream>
 #include<string>
 #include<cstring>
 #include<cmath>
@@ -52,7 +53,9 @@ public:
    }
 
    EHModel_Hamiltonian(int Lval=8);
-   
+  
+   template<typename OPTIONS> void add_options(OPTIONS& options);
+
    void init(bool verbose=false);
 
    char model_fn[100];
@@ -74,8 +77,13 @@ EHModel_Hamiltonian::EHModel_Hamiltonian(int Lval)
    std::strcpy(model_ft,filetypes[0].c_str());
 }
 
-
-
+template<typename OPTIONS>
+void EHModel_Hamiltonian::add_options(OPTIONS& options)
+{
+   options.add_option("H",        "magnitude of magnetic field",    'H', &H );
+   options.add_option("ehfile",   "EHModel input file",             ' ', model_fn );
+   options.add_option("ehfilet",  "EHModel input file type",        ' ', model_ft );
+}
 
 void EHModel_Hamiltonian::init(bool verbose) 
 {
@@ -132,6 +140,7 @@ void EHModel_Hamiltonian::init(bool verbose)
 
 void EHModel_Hamiltonian::calc_observable(Config& sigma, Heisenberg_Observables& macro)
 {
+   macro.H = H;
    macro.V = nspin;
    double* S(&sigma[0]);            // Hiesenberg specific
    if( false )
@@ -227,7 +236,7 @@ void EHModel_Hamiltonian::change(EHModel_Hamiltonian::Config& sigma, Heisenberg_
    macro.X   = std::sqrt(macro.Mmag2);
    macro.M   = (H==0)? macro.X : macro.M3d[2];
    // check energy
-   if( true ) {
+   if( false ) {
       static int icount = 0;
       Heisenberg_Observables direct(macro);
       calc_observable(sigma,direct);
@@ -312,10 +321,11 @@ void EHModel_Hamiltonian::write_KiJij(std::string filename)
    std::ofstream fout(filename.c_str());
    fout << "# EHModel KiJij output" << std::endl;
    fout << "# nspin numneighbor" << std::endl;
-   fout << "# Kx, Ky Kz, |K|; jspin Jij" << std::endl;
+   fout << "# moment; Kx, Ky Kz, |K|; jspin Jij" << std::endl;
    fout << nspin << " " << nngbr << std::endl;
    for(int ispin=0; ispin<nspin; ispin++)
    {
+      fout << moment[ispin] << std::endl;
       fout << KiJij[ispin*(nngbr+4)+0] << " " << KiJij[ispin*(nngbr+4)+1] << " " << KiJij[ispin*(nngbr+4)+2] << " " << KiJij[ispin*(nngbr+4)+3] << std::endl;
       for(int ingbr=0; ingbr<nngbr; ingbr++)
          fout << jspin[ispin*nngbr+ingbr] << " " << KiJij[ispin*(nngbr+4)+4+ingbr] << std::endl;
