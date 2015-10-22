@@ -47,6 +47,7 @@ void DoIt(int& argc, char* argv[])
    wanglandau.Qquit = 0.05;
    wanglandau.MaxUpdate = 15;
    wanglandau.NWindow = 1;
+   wanglandau.wall_limit = 2*24*60*60;
    options.add_option( "numwalk",   "number of walkers per window",   ' ', &(wanglandau.NWalkPerProcess));
    options.add_option( "nstep",     "number of steps per iteration",  ' ', &(wanglandau.NStep));
    options.add_option( "maxupdate", "maximum number of iterations",   ' ', &(wanglandau.MaxUpdate));
