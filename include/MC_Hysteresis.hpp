@@ -27,7 +27,7 @@ public:
    long NStep0;           // Period (in MCSS), or time of first part
    long NStep1;           // time of second parts
    long NCycle;           // Number of cycles to simulate
-   long NStep;            // MC Stepes per spin (MCSS) between measurements
+   long NStep;            // MC Steps per spin (MCSS) between measurements
    MPI_Struct mp;         // Multiprocessing information
    int NWalkPerProcess;   // Number of (embarassingly) parallel      
 
@@ -108,7 +108,6 @@ MC_Hysteresis::MC_Hysteresis()
    NStep1 = 0;  
    NCycle = NStep0+NStep1; 
    NStep = 1; 
-   int NWalkPerProcess;   // Number of (embarassingly) parallel      
    ckpt_freq = 10*60;      // 10 minutes
    wall_limit = 24*60*60;  // 1 day
    at_wall_limit = false;
