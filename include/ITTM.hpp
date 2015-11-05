@@ -141,7 +141,8 @@ void ITTM::init(double Emin, double Emax, double _EBin)
 
 void ITTM::read()
 {
-   if( mp.iproc==0 || C.size()==0 ) return;
+   if( mp.iproc!=0 ) return;
+   if( C.size()==0 ) return;
    std::ifstream fin("ITTM_CBand.csv");
    if( fin && fin.is_open() )
    {
