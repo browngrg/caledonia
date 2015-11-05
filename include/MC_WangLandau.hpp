@@ -142,6 +142,7 @@ public:
                                        // RG Ghulghazaryan, S. Hayryan, CK Hu, J Comp Chem 28,  715-726 (2007)
    bool convh;                         // Converge via ln(g_i+1) = ln(g_i) + ln(h_i) when wlgamma = 0;
    bool output_configs;
+   bool make_movie;                    // Number files by iloop instead of iupdate
 
    double kTlo, kThi;                  // Range of output temperatures for WriteWLBoltzmann
    
@@ -190,6 +191,7 @@ private:
 MC_WangLandau::MC_WangLandau()
 {
    // Default values
+   make_movie = false;
    stype   = latgas;
    verbose = false;
    NWindow = 1;
@@ -228,6 +230,7 @@ void MC_WangLandau::add_options(OPTIONS& options)
    this->wleta = 0;
    this->wlgamma_start = 1;
    this->Qquit = 0.10;
+   this->make_movie = false;
    lng_est_fn[0]=0;
    options.add_option( "Elo",     "lower side of energy window",    ' ', &(this->Elo));
    options.add_option( "Ehi",     "lower side of energy window",    ' ', &(this->Ehi));
@@ -242,6 +245,7 @@ void MC_WangLandau::add_options(OPTIONS& options)
    options.add_option( "wlgamma",  "starting value of WL parameter",' ', &(this->wlgamma_start));
    options.add_option( "Q",        "target convergence factor",     ' ', &(this->Qquit));
    options.add_option( "dos",      "dos file to use in sampling",   ' ', lng_est_fn);
+   options.add_option( "movie",    "use iloop to number output",    ' ', &(this->make_movie));
 }
 
 MC_WangLandau::~MC_WangLandau()
@@ -910,7 +914,7 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
          walkerpool[iwalk].Sfixed = walkerpool[iwalk].S;  // zeros from above
    }
    //std::cout << model.header();
-   double qthresh = 1;
+   double qthresh = Qquit;
    double WLQold = 0;
    double fvisit_old = 0;
    double fvisit_target = 1;
@@ -941,9 +945,11 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
       double wlqsdev = (iwlq>wlqsave.size())? stddev(wlqsave) : 2*Qquit;
       iwlq++;
       global_walker.wlgamma = walkerpool[0].wlgamma;
-      WriteWLDOS(global_walker,iupdate);
-      WriteWLBoltzmann(global_walker,iupdate);
-      if( output_configs ) WriteWalkers(walkerpool,iupdate);
+      int iwrite = iupdate;
+      if( make_movie ) iwrite = iloop;
+      WriteWLDOS(global_walker,iwrite);
+      WriteWLBoltzmann(global_walker,iwrite);
+      if( output_configs ) WriteWalkers(walkerpool,iwrite);
       if( mp_window.ngang>1 ) DoReplicaExchange(model,walkerpool);
       // Decide about advancing WL parameter
       int ivisit = 0;
@@ -969,7 +975,6 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
       {
          fvisit_same = 0;
       }
-      bool qconverged = (std::fabs(WLQ-WLQold)<qthresh);
       if( mp_window.pool.iproc==0 )
       {
          double psecs = static_cast<double>(clock())/static_cast<double>(CLOCKS_PER_SEC);
@@ -995,7 +1000,7 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
          istep = 0;
          iupdate++;
       }
-      if( global_walker.wlgamma==0 && this->convh && qconverged && allvisit )
+      if( global_walker.wlgamma==0 && wlqsdev<qthresh && allvisit )
       {
          double global_min = 1e-20;
          for(int ibin=0; ibin<global_walker.h.size(); ibin++) 
