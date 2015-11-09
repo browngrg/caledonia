@@ -623,7 +623,6 @@ void MC_WangLandau::WriteWLDOS(const Walker& walker, int iupdate)
    bool EbinOK = (EStepFrac>1) && (EStepFrac<10);
    // Write the data
    char fname[100];
-   if( walker.wlgamma==0 && iupdate<1 ) iupdate = 1;                            // save at least one WL stage
    if( global )
       sprintf(fname,"WangLandau-%02d.csv",iupdate);                             // Global output
    else
@@ -1022,12 +1021,9 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
                walkerpool[iwalk].S[ibin]  = (1.-wleta)*(walkerpool[iwalk].S[ibin]+lng) + wleta*ittm;
             }
          }
-         if( allvisit )
-         {  // Only call it an update if visiting all bins
-            iupdate++;
-            istep = 0;
-            qthresh *= 0.1;
-         }
+         iupdate++;
+         istep = 0;
+         qthresh *= 0.1;
          fvisit = 0;
          WLQold = 0;
          for(int iwalk=0; iwalk<NWalker; iwalk++)
@@ -1037,6 +1033,12 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
       WLQold = WLQ;
       fvisit_old = fvisit;
       iloop++;
+   }
+   if( at_wall_limit && mp_window.pool.iproc==0 )
+   {
+      std::cout << "***Reached Wall Time Limit***" << std::endl;
+      std::cout << "elapsed time = " << ptime.elapsed() << std::endl;
+      std::cout << "wall limit = " << wall_limit << std::endl;
    }
    // Copy global walker histogram into walks
    for(int iwalk=0; iwalk<NWalker; iwalk++)
