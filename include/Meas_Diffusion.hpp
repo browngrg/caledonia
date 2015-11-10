@@ -23,6 +23,8 @@ public:
 
    void init(float Emin, float Emax, float Ebin);
 
+   template<typename SIMULATION> void init(SIMULATION& sim);
+
    void clear() { old.clear(); for(int i=0; i<NBinE; i++) Emom[i]=0; }
 
    void write();
@@ -61,6 +63,12 @@ void Meas_Diffusion::init(float Emin, float Emax, float _Ebin)
    Ehi = Elo + Ebin*NBinE;
    Emom.resize( MAXK*NBinE );
    clear();
+}
+
+
+template<typename SIMULATION> void Meas_Diffusion::init(SIMULATION& sim)
+{
+   this->init(sim.Elo,sim.Ehi,sim.Ehi);
 }
 
 
