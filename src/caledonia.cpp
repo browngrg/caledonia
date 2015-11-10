@@ -3,6 +3,8 @@
 
 #include"MC_WangLandau.hpp"
 #include"WL_Walker.hpp"
+#include"MC_Metropolis.hpp"
+#include"RE_Walker.hpp"
 #include"../mfia/Mfia_Hamiltonian.hpp"
 #include"../ehmodel/EHModel_Hamiltonian.hpp"
 #include"MPI_Struct.hpp"
@@ -16,23 +18,9 @@
 #include<algorithm>
 
 
-class CaledoniaDriver
-{
-   public:
-      virtual void DoCalculation(ProgramOptions& options, int& argc, char* argv[] ) = 0;
-};
 
-
-template<typename HAMILTON, typename MEASURE>
-class WangLandauDriver : public CaledoniaDriver
-{
-public:
-   void DoCalculation(ProgramOptions& options, int& argc, char* argv[]);
-};
-
-
-template<typename HAMILTON, typename MEASURE>
-void WangLandauDriver<HAMILTON,MEASURE>::DoCalculation(ProgramOptions& options, int& argc, char* argv[])
+template<typename SIMULATION, template<typename,typename> class WALKER, typename HAMILTON, typename MEASURE>
+void CaledoniaDriver(ProgramOptions& options, int& argc, char* argv[])
 {
    //  Get basic MPI information
    MPI_Struct world;
@@ -50,10 +38,10 @@ void WangLandauDriver<HAMILTON,MEASURE>::DoCalculation(ProgramOptions& options, 
    hamilton.add_options(options);
 
    // Construct the sampling object
-   MC_WangLandau simulation;
+   SIMULATION simulation;
    simulation.add_options(options);
 
-   typedef WL_Walker<typename HAMILTON::Config,typename HAMILTON::Observables> Walker;
+   typedef WALKER<typename HAMILTON::Config,typename HAMILTON::Observables> Walker;
    std::vector<Walker> walkerpool(1);
 
    // The measurement object
@@ -84,12 +72,11 @@ void WangLandauDriver<HAMILTON,MEASURE>::DoCalculation(ProgramOptions& options, 
    // This includes the "microscopic" configuration sigma_i
    // and the macroscopic quantities like magnetization and energy
    if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " Beginning simulation" << std::endl;
-   simulation.DoConverge(hamilton,walkerpool,measure_obj);
+   simulation.DoCalculate(hamilton,walkerpool,measure_obj);
 
    if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " Saving options" << std::endl;
    options.write();
 }
-
 
 
 int main(int argc, char* argv[])
@@ -116,21 +103,28 @@ int main(int argc, char* argv[])
    world = MPI_Struct::world();
 #  endif
 
-   CaledoniaDriver* Driver = 0;
    ProgramOptions options("caledonia","Monte Carlo simulations");
    char model_name[128] = "ising";
    char sim_name[128] = "wanglandau";
    options.add_option("model","Hamiltonian type", ' ', model_name);
    options.add_option("sim",  "Monte Carlo simulation type", ' ', sim_name);
    options.parse_command_line2(argc,argv);
-   if( strcmp(sim_name,"wanglandau")==0 )
-   {
-      if( strcmp(model_name,"ising")==0 )   { Driver = new WangLandauDriver<Mfia_Hamiltonian,EMX_Measure>(); }
-      else if( strcmp(model_name,"ehmodel")==0 ) { Driver = new  WangLandauDriver<EHModel_Hamiltonian,EMX_Measure>(); }
+   // Have to code explicit combinations of sim,model that are valid
+   if( strcmp(sim_name,"wanglandau")==0 ) 
+   { 
+      // Wang-Landau Simulations
+      if( model_name=="ising" )       { CaledoniaDriver<MC_WangLandau,WL_Walker,Mfia_Hamiltonian,EMX_Measure>(options,argc,argv); }
+      else if( model_name=="ehmodel") { CaledoniaDriver<MC_WangLandau,WL_Walker,EHModel_Hamiltonian,EMX_Measure>(options,argc,argv); }
       else { if(world.iproc==0) std::cout << "model \"" << model_name << "\" not recognized for \"" << sim_name << "\"" << std::endl; }
    }
-
-   Driver->DoCalculation(options,argc,argv);
+   else if( strcmp(sim_name,"metropolis")==0 ) 
+   {
+      // Metropolis Simulations
+      if( model_name=="ising" )       { CaledoniaDriver<MC_Metropolis,RE_Walker,Mfia_Hamiltonian,Null_Measure>(options,argc,argv); }
+      else if( model_name=="ehmodel") { CaledoniaDriver<MC_Metropolis,RE_Walker,EHModel_Hamiltonian,Null_Measure>(options,argc,argv); }
+      else { if(world.iproc==0) std::cout << "model \"" << model_name << "\" not recognized for \"" << sim_name << "\"" << std::endl; }
+   }
+   else { if(world.iproc==0) std::cout << "sim \"" << sim_name << "\" not recognized" << std::endl; }
 
 #  ifdef USE_MPI
    MPI_Finalize();
