@@ -16,10 +16,24 @@
 #include<algorithm>
 
 
-template<typename HAMILTON, typename MEASURE>
-void WangLandauDriver(ProgramOptions& options, int& argc, char* argv[])
+class CaledoniaDriver
 {
+   public:
+      virtual void DoCalculation(ProgramOptions& options, int& argc, char* argv[] ) = 0;
+};
 
+
+template<typename HAMILTON, typename MEASURE>
+class WangLandauDriver : public CaledoniaDriver
+{
+public:
+   void DoCalculation(ProgramOptions& options, int& argc, char* argv[]);
+};
+
+
+template<typename HAMILTON, typename MEASURE>
+void WangLandauDriver<HAMILTON,MEASURE>::DoCalculation(ProgramOptions& options, int& argc, char* argv[])
+{
    //  Get basic MPI information
    MPI_Struct world;
    world = MPI_Struct::world();
@@ -102,6 +116,7 @@ int main(int argc, char* argv[])
    world = MPI_Struct::world();
 #  endif
 
+   CaledoniaDriver* Driver = 0;
    ProgramOptions options("caledonia","Monte Carlo simulations");
    char model_name[128] = "ising";
    char sim_name[128] = "wanglandau";
@@ -110,11 +125,12 @@ int main(int argc, char* argv[])
    options.parse_command_line2(argc,argv);
    if( strcmp(sim_name,"wanglandau")==0 )
    {
-      if( strcmp(model_name,"ising")==0 )   {  WangLandauDriver<Mfia_Hamiltonian,EMX_Measure>(options,argc,argv); }
-      else if( strcmp(model_name,"ehmodel")==0 ) {  WangLandauDriver<EHModel_Hamiltonian,EMX_Measure>(options,argc,argv); }
+      if( strcmp(model_name,"ising")==0 )   { Driver = new WangLandauDriver<Mfia_Hamiltonian,EMX_Measure>(); }
+      else if( strcmp(model_name,"ehmodel")==0 ) { Driver = new  WangLandauDriver<EHModel_Hamiltonian,EMX_Measure>(); }
       else { if(world.iproc==0) std::cout << "model \"" << model_name << "\" not recognized for \"" << sim_name << "\"" << std::endl; }
    }
 
+   Driver->DoCalculation(options,argc,argv);
 
 #  ifdef USE_MPI
    MPI_Finalize();
