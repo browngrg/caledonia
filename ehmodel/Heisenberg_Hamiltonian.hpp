@@ -138,6 +138,8 @@ public:
 
    virtual void init(bool verbose=false);
 
+   template<typename OPTIONS> void add_options(OPTIONS& options);
+
    void initial(Config& sigma) const;
    void initial_mixed(Config& sigma) const;
    void initial_ferro(Config& sigma) const;
@@ -196,6 +198,14 @@ void Heisenberg_Hamiltonian::init(bool verbose)
    } 
 }
 
+
+template<typename OPTIONS>
+void Heisenberg_Hamiltonian::add_options(OPTIONS& options)
+{
+   options.add_option("L", "length of side",              'L', &L);
+   options.add_option("H", "magnitude of magnetic field", 'H', &H);
+
+}
  
 
 void Heisenberg_Hamiltonian::calc_observable(Heisenberg_Hamiltonian::Config& sigma, Heisenberg_Observables& macro)
