@@ -96,6 +96,7 @@ void DoHeisenberg(int& argc, char* argv[])
    wanglandau.Elo   = -11000;
    wanglandau.Ehi   = +11000;
    wanglandau.Ebin  = 1;
+   wanglandau.wall_limit = 5*24*60*60;
    options.add_option( "Elo",     "lower side of energy window",    ' ', &(wanglandau.Elo));
    options.add_option( "Ehi",     "lower side of energy window",    ' ', &(wanglandau.Ehi));
    options.add_option( "Ebin",    "width of energy bins",           ' ', &(wanglandau.Ebin));
@@ -110,6 +111,7 @@ void DoHeisenberg(int& argc, char* argv[])
    options.add_option( "wlgamma",  "starting value of WL parameter",' ', &(wanglandau.wlgamma_start));
    options.add_option( "Q",        "target convergence factor",     ' ', &(wanglandau.Qquit));
    options.add_option( "configout","output configurations to disk", ' ', &(wanglandau.output_configs));
+   options.add_option( "walllimit","maximum run time",              ' ', &(wanglandau.wall_limit));
 
 #  undef MEASURE_DIFFUSION
 #  ifdef MEASURE_DIFFUSION
