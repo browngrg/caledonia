@@ -85,6 +85,10 @@ public:
    void DoConverge(Model& model, std::vector<Walker>& wlpool, Measure& measure);
 
    template<typename Model, typename Walker, typename Measure>
+   void DoCalculate(Model& model, std::vector<Walker>& wlpool, Measure& measure)
+   { this->DoConverge(model,wlpool,measure); }
+
+   template<typename Model, typename Walker, typename Measure>
    void DoSample(Model& model, std::vector<Walker>& wlpool, Measure& measure);
 
    template<typename Model, typename Walker>
@@ -246,6 +250,7 @@ void MC_WangLandau::add_options(OPTIONS& options)
    options.add_option( "Q",        "target convergence factor",     ' ', &(this->Qquit));
    options.add_option( "dos",      "dos file to use in sampling",   ' ', lng_est_fn);
    options.add_option( "movie",    "use iloop to number output",    ' ', &(this->make_movie));
+   options.add_option( "walllimit","maximum run time",              ' ', &(this->wall_limit));
 }
 
 MC_WangLandau::~MC_WangLandau()
