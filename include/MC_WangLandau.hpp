@@ -675,7 +675,6 @@ void MC_WangLandau::WriteWLBoltzmann(const Walker& walker, int iupdate)
    if( mp_window.pool.iproc!=0) return;
    // Write the data
    char fname[100];
-   if( walker.wlgamma==0 && iupdate<1 ) iupdate = 1;                          // save at least one WL stage
    sprintf(fname,"WLBoltzmann-%02d.csv",iupdate);                             // Global output
    std::ofstream fout(fname);
    fout << "# Wang-Landau thermodynamic properties calculated via Boltzmann sum" << std::endl;
