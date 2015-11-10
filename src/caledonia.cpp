@@ -7,10 +7,12 @@
 #include"RE_Walker.hpp"
 #include"../mfia/Mfia_Hamiltonian.hpp"
 #include"../ehmodel/EHModel_Hamiltonian.hpp"
+#include"../ehmodel/Heisenberg_Hamiltonian.hpp"
 #include"MPI_Struct.hpp"
 #include"Random.hpp"
 #include"EMX_Measure.hpp"
 #include"Null_Measure.hpp"
+#include"Meas_Diffusion.hpp"
 #include"ProgramOptions.hpp"
 
 #include<stdio.h>
@@ -113,15 +115,16 @@ int main(int argc, char* argv[])
    if( strcmp(sim_name,"wanglandau")==0 ) 
    { 
       // Wang-Landau Simulations
-      if( model_name=="ising" )       { CaledoniaDriver<MC_WangLandau,WL_Walker,Mfia_Hamiltonian,EMX_Measure>(options,argc,argv); }
-      else if( model_name=="ehmodel") { CaledoniaDriver<MC_WangLandau,WL_Walker,EHModel_Hamiltonian,EMX_Measure>(options,argc,argv); }
+      if( strcmp(model_name,"ising")==0 )         { CaledoniaDriver<MC_WangLandau,WL_Walker,Mfia_Hamiltonian,EMX_Measure>(options,argc,argv); }
+      else if( strcmp(model_name,"ehmodel")==0 )  { CaledoniaDriver<MC_WangLandau,WL_Walker,EHModel_Hamiltonian,EMX_Measure>(options,argc,argv); }
+      else if( strcmp(model_name,"heisdiff")==0 ) { CaledoniaDriver<MC_WangLandau,WL_Walker,Heisenberg_Hamiltonian,Meas_Diffusion>(options,argc,argv); }
       else { if(world.iproc==0) std::cout << "model \"" << model_name << "\" not recognized for \"" << sim_name << "\"" << std::endl; }
    }
    else if( strcmp(sim_name,"metropolis")==0 ) 
    {
       // Metropolis Simulations
-      if( model_name=="ising" )       { CaledoniaDriver<MC_Metropolis,RE_Walker,Mfia_Hamiltonian,Null_Measure>(options,argc,argv); }
-      else if( model_name=="ehmodel") { CaledoniaDriver<MC_Metropolis,RE_Walker,EHModel_Hamiltonian,Null_Measure>(options,argc,argv); }
+      if( strcmp(model_name,"ising")==0 )        { CaledoniaDriver<MC_Metropolis,RE_Walker,Mfia_Hamiltonian,Null_Measure>(options,argc,argv); }
+      else if( strcmp(model_name,"ehmodel")==0 ) { CaledoniaDriver<MC_Metropolis,RE_Walker,EHModel_Hamiltonian,Null_Measure>(options,argc,argv); }
       else { if(world.iproc==0) std::cout << "model \"" << model_name << "\" not recognized for \"" << sim_name << "\"" << std::endl; }
    }
    else { if(world.iproc==0) std::cout << "sim \"" << sim_name << "\" not recognized" << std::endl; }
