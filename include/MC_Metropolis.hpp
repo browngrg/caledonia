@@ -68,11 +68,20 @@ public:
    {
    }
 
+   template<typename OPTIONS> void add_options(OPTIONS& options);
+
+   template<typename HAMILTON, typename WALKER> 
+   void init(HAMILTON& hamilton, std::vector<WALKER>& pool, bool verbose=false);
+
    template<typename Hamiltonian, typename MCWalker>
    void DoNStep(long NStep, Hamiltonian& hamilton, MCWalker& walker);
 
    template<typename Hamiltonian, typename MCWalker, typename MeasureObj>
    void DoSample(Hamiltonian& model, std::vector<MCWalker>& walker, MeasureObj& measure_obj);
+
+   template<typename Hamiltonian, typename MCWalker, typename MeasureObj>
+   void DoCalculate(Hamiltonian& model, std::vector<MCWalker>& walker, MeasureObj& measure_obj) 
+   { DoSample(model,walker,measure_obj); }
 
    template<typename MCWalker>
    void InitPool(std::vector<MCWalker>& walkerpool);
@@ -132,6 +141,49 @@ void MC_Metropolis::DoNStep(long NStep, Hamiltonian& hamilton, MCWalker& walker)
       walker.imcs++;
    }
    walker.MCSS = static_cast<double>(walker.imcs)/static_cast<double>(walker.now.V);
+}
+
+
+template<typename OPTIONS>
+void MC_Metropolis::add_options(OPTIONS& options)
+{
+   NMeas  = 10000;         // Number of measurements to take
+   NTherm = 100;           // Number of measurement blocks before begin averaging
+   NStep  = 5;             // Number of steps to take between measurements to minimize correlations
+   kTmin  = 0.5;           // Temperature of simulation
+   kTmax  = 3;             // Temperature of simulation
+   options.add_option("nmeas",  "number of measurements",         ' ', &(NMeas) ); 
+   options.add_option("ntherm", "number of thermalize moves",     ' ', &(NTherm) ); 
+   options.add_option("nstep",  "number of MC moves between meas",' ', &(NStep) ); 
+   options.add_option("kTmin",  "temperature of simulation",      ' ', &(kTmin) );
+   options.add_option("kTmax",  "temperature of simulation",      ' ', &(kTmax) );
+   options.add_option("nwalk",  "number of walkers per process",  ' ', &(NWalkPerProcess) );
+   options.add_option("nexchg", "number of meas between replica exchange", ' ', &(NExchg) );
+   options.add_option("walllimit", "maximum run time (seconds)",           ' ', &(wall_limit) );
+   options.add_option("ckpt",      "how often to checkpoint (seconds)",    ' ', &(ckpt_freq) );
+}
+
+
+template<typename HAMILTON, typename WALKER> 
+void MC_Metropolis::init(HAMILTON& hamilton, std::vector<WALKER>& walkerpool, bool _verbose)
+{
+   bool verbose = _verbose;
+   this->mp = MPI_Struct::world();
+   hamilton.calc_observable(walkerpool[0].sigma,walkerpool[0].now);
+   this->InitPool(walkerpool);
+   // Flip the configuration of half the walks so evenly sample +/-FM configurations (for low fields)
+   if( walkerpool.size()>1 && std::fabs(hamilton.H)<0.1 )
+   {
+      for(int ispin=0; ispin<walkerpool[1].sigma.size(); ispin++) walkerpool[1].sigma[ispin] *= -1;
+      hamilton.calc_observable(walkerpool[1].sigma,walkerpool[1].now);
+      for(int iwalk=3; iwalk<walkerpool.size(); iwalk+=2)
+      {
+         walkerpool[iwalk].sigma = walkerpool[1].sigma;
+         walkerpool[iwalk].now = walkerpool[1].now;
+      }
+   }
+   // Read configurations from disk, if they exist
+   this->read_config(hamilton,walkerpool);
 }
 
 
