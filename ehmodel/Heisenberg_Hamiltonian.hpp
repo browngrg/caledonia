@@ -202,7 +202,7 @@ void Heisenberg_Hamiltonian::init(bool verbose)
 template<typename OPTIONS>
 void Heisenberg_Hamiltonian::add_options(OPTIONS& options)
 {
-   options.add_option("L", "length of side",              'L', &L);
+   options.add_option("length", "length of side",         'L', &L);
    options.add_option("H", "magnitude of magnetic field", 'H', &H);
 
 }
