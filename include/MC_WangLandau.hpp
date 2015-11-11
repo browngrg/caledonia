@@ -261,8 +261,9 @@ MC_WangLandau::~MC_WangLandau()
 template<typename HAMILTON, typename WALKER> 
 void MC_WangLandau::init(HAMILTON& hamilton, std::vector<WALKER>& walkerpool, bool _verbose)
 {
-   verbose = _verbose;
    this->mp_window.pool = MPI_Struct::world();
+   verbose = _verbose && (this->mp_window.pool.iproc==0);
+   if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " entering init" << std::endl;
    hamilton.calc_observable(walkerpool[0].sigma,walkerpool[0].now);
    if( this->Elo>=this->Ehi )
    {
@@ -286,6 +287,7 @@ void MC_WangLandau::init(HAMILTON& hamilton, std::vector<WALKER>& walkerpool, bo
             lng_est.push_back(lng);
          }
       }
+      if(verbose) std::cout << "Read DOS from \"" << lng_est_fn << "\" for " << lng_est.size() << " bins" << std::endl;
    }
    if( energy.size()==0 )
    {
@@ -303,7 +305,7 @@ void MC_WangLandau::init(HAMILTON& hamilton, std::vector<WALKER>& walkerpool, bo
    {
       int i=0; 
       while( i<energy.size() && energy[i]<this->Elo ) i++;
-      if( i<energy.size() )
+      if( i>0 && i<energy.size() )
       { 
          if(verbose) std::cout << "Elo = " << this->Elo << std::endl;
          if(verbose) std::cout << "Trimming energy from " << energy.front() << " with " << energy.size() << " elements" << std::endl;
@@ -1294,7 +1296,7 @@ void MC_WangLandau::partition_windows()
 {
    if( !mp_window.pool.in() ) return;
    int iproc= mp_window.pool.iproc;
-   if( iproc==0 ) 
+   if( verbose ) 
       std::cout << __FILE__ << ":" << __LINE__ <<  "(" << iproc << ") Global Window = [" << Elo << "," << Ehi << "] Ebin=" << Ebin << std::endl;
    if(Elo>Ehi) std::swap(Elo,Ehi);
    float deltawin = (Ehi-Elo)/(static_cast<float>(NWindow)*(1-fwinover)+fwinover);
@@ -1311,7 +1313,7 @@ void MC_WangLandau::partition_windows()
    Ewin[2*(NWindow-1)+0] = Ehi - deltawin;                                 // Make last window stretch
    Ewin[2*(NWindow-1)+1] = Ehi;                                            // From end back
    Ewin[0] = Elo;                                                          // When Nwindow==1
-   if(iproc==0)
+   if(verbose)
    {
       std::cout << __FILE__ << ":" << __LINE__ << " Windows Ebin=" << Ebin << " numbin=" << nbin << std::endl;
       for(int iwin=0; iwin<NWindow; iwin++) std::cout << iwin << " " << Ewin[2*iwin] << " " << Ewin[2*iwin+1] << std::endl;
