@@ -607,7 +607,8 @@ void ProgramOptions::parse_command_line2(int argc, char* argv[])
          else
          {
             int iopt = char_option[arg[1]];
-            if( iopt>=0 && iopt<128 )
+            if( iopt=='v' ) set_value(option['v'].name,true);
+            else if( iopt>=0 && iopt<128 )
             set_value(option[iopt].name,argv[iarg+1]);
          }
       }
