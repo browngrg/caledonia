@@ -1,0 +1,776 @@
+cmdline: ../lsmswl -i ./ProgramOptionsIn.txt
+LSMS_3
+ Size of LSMS instances = 2 atoms
+ Number of LSMS instances = 2
+ LSMS Energy calculated using oneStepEnergy [frozen potential band energy]
+ Exploring spin configurational space
+ Number of gWL steps = 4
+ Processor alignment (process allocation quantization) = 1
+ Constant moments direction along 0 0 1
+ Step output written to: steps.txt
+
+Constructor of ConstantEvecGenerator called.
+This is the master node
+starting main calculation in group 0
+      3 steps remaining
+starting main calculation in group 1
+      2 steps remaining
+LSMS_3: Program started
+Using 1 MPI processes
+Using 2 OpenMP threads
+Reading input file 'i_lsms'
+Title    : 'Iron test for LSMS 3'
+Id       : 'fe2'
+No. Atoms: 2
+Mtasa    : 0
+Pot. In  : v_fe2 [Text (BIGCELL format)]
+Pot. Out : w_fe2 [Text (BIGCELL format)]
+spin_cant: 2
+xcFunctional: 0 1 -1 [von Barth-Hedin (LSMS_1)]
+RMS Tolerance: 1e-08
+Bravais lattice : 5.420000 0.000000 0.000000
+                : 0.000000 5.420000 0.000000
+                : 0.000000 0.000000 5.420000
+Atom       1 : 0.000000 0.000000 0.000000
+             : evec = 0.000000 0.000000 1.000000
+             : type = 1
+Atom       2 : 2.710000 2.710000 2.710000
+             : evec = 0.000000 0.000000 1.000000
+             : type = 2
+Type       1 : Fe [0.0]
+             : pot_in_idx = 0 (Potential file index for input)
+             : lmax = 3, rLIZ = 5.000000
+             : rsteps = 89.500000 91.500000 93.200000 99.900000
+Type       2 : Fe [0.1]
+             : pot_in_idx = 1 (Potential file index for input)
+             : lmax = 3, rLIZ = 5.000000
+             : rsteps = 89.500000 91.500000 93.200000 99.900000
+No. of Alloy Classes : 0
+
+ SETUP_VORPOL:: Boundary Planes
+          1  -1.35500  -1.35500  -1.35500
+          2  -1.35500  -1.35500   1.35500
+          3  -1.35500   1.35500  -1.35500
+          4  -1.35500   1.35500   1.35500
+          5   1.35500  -1.35500  -1.35500
+          6   1.35500  -1.35500   1.35500
+          7   1.35500   1.35500  -1.35500
+          8   1.35500   1.35500   1.35500
+          9   2.71000   0.00000   0.00000
+         10   0.00000   2.71000   0.00000
+         11   0.00000   0.00000   2.71000
+         12   0.00000   0.00000  -2.71000
+         13   0.00000  -2.71000   0.00000
+         14  -2.71000   0.00000   0.00000
+
+ SETUP_VORPOL:: nbnd,ncorn,nedge:   14   24   36
+ SETUP_VORPOL:: number of critical r-points for w(r) =    4
+            i=   1 rcrit=2.3469288443D+00
+            i=   2 rcrit=2.7100000000D+00
+            i=   3 rcrit=2.8743890655D+00
+            i=   4 rcrit=3.0298721095D+00
+Title    : 'Iron test for LSMS 3'
+Id       : 'fe2'
+No. Atoms: 2
+Mtasa    : 0
+Pot. In  : v_fe2 [Text (BIGCELL format)]
+Pot. Out : w_fe2 [Text (BIGCELL format)]
+spin_cant: 2
+xcFunctional: 0 1 -1 [von Barth-Hedin (LSMS_1)]
+RMS Tolerance: 1e-08
+Bravais lattice : 5.420000 0.000000 0.000000
+                : 0.000000 5.420000 0.000000
+                : 0.000000 0.000000 5.420000
+Atom       1 : 0.000000 0.000000 0.000000
+             : evec = 0.000000 0.000000 1.000000
+             : type = 1
+Atom       2 : 2.710000 2.710000 2.710000
+             : evec = 0.000000 0.000000 1.000000
+             : type = 2
+Type       1 : Fe [0.0]
+             : pot_in_idx = 0 (Potential file index for input)
+             : lmax = 3, rLIZ = 5.000000
+             : rsteps = 89.500000 91.500000 93.200000 99.900000
+Type       2 : Fe [0.1]
+             : pot_in_idx = 1 (Potential file index for input)
+             : lmax = 3, rLIZ = 5.000000
+             : rsteps = 89.500000 91.500000 93.200000 99.900000
+No. of Alloy Classes : 0
+
+ SETUP_VORPOL:: Boundary Planes
+          1  -1.35500  -1.35500  -1.35500
+          2  -1.35500  -1.35500   1.35500
+          3  -1.35500   1.35500  -1.35500
+          4  -1.35500   1.35500   1.35500
+          5   1.35500  -1.35500  -1.35500
+          6   1.35500  -1.35500   1.35500
+          7   1.35500   1.35500  -1.35500
+          8   1.35500   1.35500   1.35500
+          9   2.71000   0.00000   0.00000
+         10   0.00000   2.71000   0.00000
+         11   0.00000   0.00000   2.71000
+         12   0.00000   0.00000  -2.71000
+         13   0.00000  -2.71000   0.00000
+         14  -2.71000   0.00000   0.00000
+
+ SETUP_VORPOL:: nbnd,ncorn,nedge:   14   24   36
+ SETUP_VORPOL:: number of critical r-points for w(r) =    4
+            i=   1 rcrit=2.3469288443D+00
+            i=   2 rcrit=2.7100000000D+00
+            i=   3 rcrit=2.8743890655D+00
+            i=   4 rcrit=3.0298721095D+00
+SETUP_VORPOL:Muffin-tin radius         =    2.34692884
+             Bounding sphere radius    =    3.02987211
+             Interstial region vol.    =   25.46129843
+
+ SETUP_VORPOL:: Boundary Planes
+          1  -1.35500  -1.35500  -1.35500
+          2  -1.35500  -1.35500   1.35500
+          3  -1.35500   1.35500  -1.35500
+          4  -1.35500   1.35500   1.35500
+          5   1.35500  -1.35500  -1.35500
+          6   1.35500  -1.35500   1.35500
+          7   1.35500   1.35500  -1.35500
+          8   1.35500   1.35500   1.35500
+          9   0.00000   0.00000  -2.71000
+         10   0.00000  -2.71000   0.00000
+         11  -2.71000   0.00000   0.00000
+         12   2.71000   0.00000   0.00000
+         13   0.00000   2.71000   0.00000
+         14   0.00000   0.00000   2.71000
+
+ SETUP_VORPOL:: nbnd,ncorn,nedge:   14   24   36
+ SETUP_VORPOL:: number of critical r-points for w(r) =    4
+            i=   1 rcrit=2.3469288443D+00
+            i=   2 rcrit=2.7100000000D+00
+            i=   3 rcrit=2.8743890655D+00
+            i=   4 rcrit=3.0298721095D+00
+SETUP_VORPOL:Muffin-tin radius         =    2.34692884
+             Bounding sphere radius    =    3.02987211
+             Interstial region vol.    =   25.46129843
+
+ SETUP_VORPOL:: Boundary Planes
+          1  -1.35500  -1.35500  -1.35500
+          2  -1.35500  -1.35500   1.35500
+          3  -1.35500   1.35500  -1.35500
+          4  -1.35500   1.35500   1.35500
+          5   1.35500  -1.35500  -1.35500
+          6   1.35500  -1.35500   1.35500
+          7   1.35500   1.35500  -1.35500
+          8   1.35500   1.35500   1.35500
+          9   0.00000   0.00000  -2.71000
+         10   0.00000  -2.71000   0.00000
+         11  -2.71000   0.00000   0.00000
+         12   2.71000   0.00000   0.00000
+         13   0.00000   2.71000   0.00000
+         14   0.00000   0.00000   2.71000
+
+ SETUP_VORPOL:: nbnd,ncorn,nedge:   14   24   36
+ SETUP_VORPOL:: number of critical r-points for w(r) =    4
+            i=   1 rcrit=2.3469288443D+00
+            i=   2 rcrit=2.7100000000D+00
+            i=   3 rcrit=2.8743890655D+00
+            i=   4 rcrit=3.0298721095D+00
+SETUP_VORPOL:Muffin-tin radius         =    2.34692884
+             Bounding sphere radius    =    3.02987211
+             Interstial region vol.    =   25.46129843
+
+Total cell volume     =    159.2200822518853
+Volume renorm. factor =      1.0000000361017
+WS cell volume        =     79.6100411261529
+Interstitial volume   =     50.9225968564917
+WS sphere radius      =      2.6686589770817
+SETUP_VORPOL:Muffin-tin radius         =    2.34692884
+             Bounding sphere radius    =    3.02987211
+             Interstial region vol.    =   25.46129843
+
+Total cell volume     =    159.2200822518853
+Volume renorm. factor =      1.0000000361017
+WS cell volume        =     79.6100411261529
+Interstitial volume   =     50.9225968564917
+WS sphere radius      =      2.6686589770817
+No. Local Atom Types : 2
+Local Atom  0 :  nspin  vdif :::::: Potentials for ferromagnetic relativistic core Fe.          
+              : -51.997284 -51.997284 -51.995045 -51.995045
+              : -511.891940 -511.891500
+              : n_per_type = 1
+Local Atom  1 :  nspin  vdif :::::: Potentials for ferromagnetic relativistic core Fe.          
+              : -51.997284 -51.997284 -51.995045 -51.995045
+              : -511.891940 -511.891500
+              : n_per_type = 1
+
+Mixing method     : broyden
+Mixing quantity   : potential
+Mixing parameters : 0.05
+
+calculateCoreState 0.0
+
+ GETCOR:: Spin index                   =    1
+
+ CORSLV:: Eigenvalues:  n    l    k            energy
+                        1    0   -1     -0.5118919398081D+03
+                        2    0   -1     -0.5890180894448D+02
+                        2    1    1     -0.5068931991215D+02
+                        2    1   -2     -0.4977536517470D+02
+                        3    0   -1     -0.5733171691581D+01
+                        3    1    1     -0.3343344184570D+01
+                        3    1   -2     -0.3229186793076D+01
+          Energy     core:             = -0.72103380D+03
+          Energy semicore:             = -0.15534889D+02
+
+ GETCOR:: Spin index                   =    2
+
+ CORSLV:: Eigenvalues:  n    l    k            energy
+                        1    0   -1     -0.5118915035501D+03
+                        2    0   -1     -0.5880096982086D+02
+                        2    1    1     -0.5061289886538D+02
+                        2    1   -2     -0.4969691845275D+02
+                        3    0   -1     -0.5527182371488D+01
+                        3    1    1     -0.3143092636907D+01
+                        3    1   -2     -0.3030338435444D+01
+          Energy     core:             = -0.72069921D+03
+          Energy semicore:             = -0.14730952D+02
+
+ GETCOR:: Muffin-tin core charge       =   9.99999989169
+          Muffin-tin semicore charge   =   7.98375665896
+
+ GETCOR:: Muffin-tin core charge       =   9.99999989169
+          Muffin-tin semicore charge   =   7.98375665896
+          Muffin-tin core+semi moment  =   0.00107777905
+          Wigner-Seitz core+semi moment=   0.00000000016
+          Interstitial charge core     =   0.01624344935
+
+calculateCoreState 0.1
+
+ GETCOR:: Spin index                   =    1
+
+ CORSLV:: Eigenvalues:  n    l    k            energy
+                        1    0   -1     -0.5118919398081D+03
+                        2    0   -1     -0.5890180894448D+02
+                        2    1    1     -0.5068931991215D+02
+                        2    1   -2     -0.4977536517470D+02
+                        3    0   -1     -0.5733171691581D+01
+                        3    1    1     -0.3343344184570D+01
+                        3    1   -2     -0.3229186793076D+01
+          Energy     core:             = -0.72103380D+03
+          Energy semicore:             = -0.15534889D+02
+
+ GETCOR:: Spin index                   =    2
+
+ CORSLV:: Eigenvalues:  n    l    k            energy
+                        1    0   -1     -0.5118915035501D+03
+                        2    0   -1     -0.5880096982086D+02
+                        2    1    1     -0.5061289886538D+02
+                        2    1   -2     -0.4969691845275D+02
+                        3    0   -1     -0.5527182371488D+01
+                        3    1    1     -0.3143092636907D+01
+                        3    1   -2     -0.3030338435444D+01
+          Energy     core:             = -0.72069921D+03
+          Energy semicore:             = -0.14730952D+02
+
+ GETCOR:: Muffin-tin core charge       =   9.99999989169
+          Muffin-tin semicore charge   =   7.98375665896
+
+ GETCOR:: Muffin-tin core charge       =   9.99999989169
+          Muffin-tin semicore charge   =   7.98375665896
+          Muffin-tin core+semi moment  =   0.00107777905
+          Wigner-Seitz core+semi moment=   0.00000000016
+          Interstitial charge core     =   0.01624344935
+Finished calculateCoreStates(...)
+
+calculateCoreState 0.0
+
+ GETCOR:: Spin index                   =    1
+
+ CORSLV:: Eigenvalues:  n    l    k            energy
+                        1    0   -1     -0.5118919398081D+03
+                        2    0   -1     -0.5890180894448D+02
+                        2    1    1     -0.5068931991215D+02
+                        2    1   -2     -0.4977536517470D+02
+                        3    0   -1     -0.5733171691581D+01
+                        3    1    1     -0.3343344184570D+01
+                        3    1   -2     -0.3229186793076D+01
+          Energy     core:             = -0.72103380D+03
+          Energy semicore:             = -0.15534889D+02
+
+ GETCOR:: Spin index                   =    2
+
+ CORSLV:: Eigenvalues:  n    l    k            energy
+                        1    0   -1     -0.5118915035501D+03
+                        2    0   -1     -0.5880096982086D+02
+                        2    1    1     -0.5061289886538D+02
+                        2    1   -2     -0.4969691845275D+02
+                        3    0   -1     -0.5527182371488D+01
+                        3    1    1     -0.3143092636907D+01
+                        3    1   -2     -0.3030338435444D+01
+          Energy     core:             = -0.72069921D+03
+          Energy semicore:             = -0.14730952D+02
+
+ GETCOR:: Muffin-tin core charge       =   9.99999989169
+          Muffin-tin semicore charge   =   7.98375665896
+
+ GETCOR:: Muffin-tin core charge       =   9.99999989169
+          Muffin-tin semicore charge   =   7.98375665896
+          Muffin-tin core+semi moment  =   0.00107777905
+          Wigner-Seitz core+semi moment=   0.00000000016
+          Interstitial charge core     =   0.01624344935
+
+calculateCoreState 0.1
+
+ GETCOR:: Spin index                   =    1
+No. Local Atom Types : 2
+Local Atom  0 :  nspin  vdif :::::: Potentials for ferromagnetic relativistic core Fe.          
+              : -51.997284 -51.997284 -51.995045 -51.995045
+              : -511.891940 -511.891500
+              : n_per_type = 1
+Local Atom  1 :  nspin  vdif :::::: Potentials for ferromagnetic relativistic core Fe.          
+              : -51.997284 -51.997284 -51.995045 -51.995045
+              : -511.891940 -511.891500
+              : n_per_type = 1
+
+Mixing method     : broyden
+Mixing quantity   : potential
+Mixing parameters : 0.05
+
+calculateCoreState 0.0
+
+ GETCOR:: Spin index                   =    1
+
+ CORSLV:: Eigenvalues:  n    l    k            energy
+                        1    0   -1     -0.5118919398081D+03
+                        2    0   -1     -0.5890180894448D+02
+                        2    1    1     -0.5068931991215D+02
+                        2    1   -2     -0.4977536517470D+02
+                        3    0   -1     -0.5733171691581D+01
+                        3    1    1     -0.3343344184570D+01
+                        3    1   -2     -0.3229186793076D+01
+          Energy     core:             = -0.72103380D+03
+          Energy semicore:             = -0.15534889D+02
+
+ GETCOR:: Spin index                   =    2
+
+ CORSLV:: Eigenvalues:  n    l    k            energy
+                        1    0   -1     -0.5118915035501D+03
+                        2    0   -1     -0.5880096982086D+02
+                        2    1    1     -0.5061289886538D+02
+                        2    1   -2     -0.4969691845275D+02
+                        3    0   -1     -0.5527182371488D+01
+                        3    1    1     -0.3143092636907D+01
+                        3    1   -2     -0.3030338435444D+01
+          Energy     core:             = -0.72069921D+03
+          Energy semicore:             = -0.14730952D+02
+
+ GETCOR:: Muffin-tin core charge       =   9.99999989169
+          Muffin-tin semicore charge   =   7.98375665896
+
+ GETCOR:: Muffin-tin core charge       =   9.99999989169
+          Muffin-tin semicore charge   =   7.98375665896
+          Muffin-tin core+semi moment  =   0.00107777905
+          Wigner-Seitz core+semi moment=   0.00000000016
+          Interstitial charge core     =   0.01624344935
+
+calculateCoreState 0.1
+
+ GETCOR:: Spin index                   =    1
+
+ CORSLV:: Eigenvalues:  n    l    k            energy
+                        1    0   -1     -0.5118919398081D+03
+                        2    0   -1     -0.5890180894448D+02
+                        2    1    1     -0.5068931991215D+02
+                        2    1   -2     -0.4977536517470D+02
+                        3    0   -1     -0.5733171691581D+01
+                        3    1    1     -0.3343344184570D+01
+                        3    1   -2     -0.3229186793076D+01
+          Energy     core:             = -0.72103380D+03
+          Energy semicore:             = -0.15534889D+02
+
+ GETCOR:: Spin index                   =    2
+
+ CORSLV:: Eigenvalues:  n    l    k            energy
+                        1    0   -1     -0.5118915035501D+03
+                        2    0   -1     -0.5880096982086D+02
+                        2    1    1     -0.5061289886538D+02
+                        2    1   -2     -0.4969691845275D+02
+                        3    0   -1     -0.5527182371488D+01
+                        3    1    1     -0.3143092636907D+01
+                        3    1   -2     -0.3030338435444D+01
+          Energy     core:             = -0.72069921D+03
+          Energy semicore:             = -0.14730952D+02
+
+ GETCOR:: Muffin-tin core charge       =   9.99999989169
+          Muffin-tin semicore charge   =   7.98375665896
+
+ GETCOR:: Muffin-tin core charge       =   9.99999989169
+          Muffin-tin semicore charge   =   7.98375665896
+          Muffin-tin core+semi moment  =   0.00107777905
+          Wigner-Seitz core+semi moment=   0.00000000016
+          Interstitial charge core     =   0.01624344935
+Finished calculateCoreStates(...)
+
+calculateCoreState 0.0
+
+ GETCOR:: Spin index                   =    1
+
+ CORSLV:: Eigenvalues:  n    l    k            energy
+                        1    0   -1     -0.5118919398081D+03
+                        2    0   -1     -0.5890180894448D+02
+                        2    1    1     -0.5068931991215D+02
+                        2    1   -2     -0.4977536517470D+02
+                        3    0   -1     -0.5733171691581D+01
+                        3    1    1     -0.3343344184570D+01
+                        3    1   -2     -0.3229186793076D+01
+          Energy     core:             = -0.72103380D+03
+          Energy semicore:             = -0.15534889D+02
+
+ GETCOR:: Spin index                   =    2
+
+ CORSLV:: Eigenvalues:  n    l    k            energy
+                        1    0   -1     -0.5118919398081D+03
+                        2    0   -1     -0.5890180894448D+02
+                        2    1    1     -0.5068931991215D+02
+                        2    1   -2     -0.4977536517470D+02
+                        3    0   -1     -0.5733171691581D+01
+                        3    1    1     -0.3343344184570D+01
+                        3    1   -2     -0.3229186793076D+01
+          Energy     core:             = -0.72103380D+03
+          Energy semicore:             = -0.15534889D+02
+
+ GETCOR:: Spin index                   =    2
+
+ CORSLV:: Eigenvalues:  n    l    k            energy
+                        1    0   -1     -0.5118915035501D+03
+                        2    0   -1     -0.5880096982086D+02
+                        2    1    1     -0.5061289886538D+02
+                        2    1   -2     -0.4969691845275D+02
+                        3    0   -1     -0.5527182371488D+01
+                        3    1    1     -0.3143092636907D+01
+                        3    1   -2     -0.3030338435444D+01
+          Energy     core:             = -0.72069921D+03
+          Energy semicore:             = -0.14730952D+02
+
+ GETCOR:: Muffin-tin core charge       =   9.99999989169
+          Muffin-tin semicore charge   =   7.98375665896
+
+ GETCOR:: Muffin-tin core charge       =   9.99999989169
+          Muffin-tin semicore charge   =   7.98375665896
+          Muffin-tin core+semi moment  =   0.00107777905
+          Wigner-Seitz core+semi moment=   0.00000000016
+          Interstitial charge core     =   0.01624344935
+** Energy Contour Integration **
+Energy Contour Parameters: grid=2 npts=31, ebot=-0.300000 etop=0.680073 eibot=0.002500 eitop=0.825000
+
+ CORSLV:: Eigenvalues:  n    l    k            energy
+                        1    0   -1     -0.5118915035501D+03
+                        2    0   -1     -0.5880096982086D+02
+                        2    1    1     -0.5061289886538D+02
+                        2    1   -2     -0.4969691845275D+02
+                        3    0   -1     -0.5527182371488D+01
+                        3    1    1     -0.3143092636907D+01
+                        3    1   -2     -0.3030338435444D+01
+          Energy     core:             = -0.72069921D+03
+          Energy semicore:             = -0.14730952D+02
+
+ GETCOR:: Muffin-tin core charge       =   9.99999989169
+          Muffin-tin semicore charge   =   7.98375665896
+
+ GETCOR:: Muffin-tin core charge       =   9.99999989169
+          Muffin-tin semicore charge   =   7.98375665896
+          Muffin-tin core+semi moment  =   0.00107777905
+          Wigner-Seitz core+semi moment=   0.00000000016
+          Interstitial charge core     =   0.01624344935
+
+calculateCoreState 0.1
+
+ GETCOR:: Spin index                   =    1
+
+ CORSLV:: Eigenvalues:  n    l    k            energy
+                        1    0   -1     -0.5118919398081D+03
+                        2    0   -1     -0.5890180894448D+02
+                        2    1    1     -0.5068931991215D+02
+                        2    1   -2     -0.4977536517470D+02
+                        3    0   -1     -0.5733171691581D+01
+                        3    1    1     -0.3343344184570D+01
+                        3    1   -2     -0.3229186793076D+01
+          Energy     core:             = -0.72103380D+03
+          Energy semicore:             = -0.15534889D+02
+
+ GETCOR:: Spin index                   =    2
+
+ CORSLV:: Eigenvalues:  n    l    k            energy
+                        1    0   -1     -0.5118915035501D+03
+                        2    0   -1     -0.5880096982086D+02
+                        2    1    1     -0.5061289886538D+02
+                        2    1   -2     -0.4969691845275D+02
+                        3    0   -1     -0.5527182371488D+01
+                        3    1    1     -0.3143092636907D+01
+                        3    1   -2     -0.3030338435444D+01
+          Energy     core:             = -0.72069921D+03
+          Energy semicore:             = -0.14730952D+02
+
+ GETCOR:: Muffin-tin core charge       =   9.99999989169
+          Muffin-tin semicore charge   =   7.98375665896
+
+ GETCOR:: Muffin-tin core charge       =   9.99999989169
+          Muffin-tin semicore charge   =   7.98375665896
+          Muffin-tin core+semi moment  =   0.00107777905
+          Wigner-Seitz core+semi moment=   0.00000000016
+          Interstitial charge core     =   0.01624344935
+** Energy Contour Integration **
+Energy Contour Parameters: grid=2 npts=31, ebot=-0.300000 etop=0.680073 eibot=0.002500 eitop=0.825000
+timeSingleScatteres = 2.045117 sec
+timeSingleScatteres = 2.204126 sec
+time in energyContourIntegration = 7.394423 sec
+  before energy loop             = 0.001000 sec
+  in energy loop                 = 7.393423 sec
+    in calculateAllTauMatrices   = 3.015172 sec
+calculateChempot: xtws = 15.736104 zvaltss = 16.000000 tnen = 24.321976 old chempot = 0.680073
+           new chempot = 0.690923
+Total valence charge =    7.06608174659657439776
+Total valence charge =    7.06608174659657883865
+received energy E_tot =         8.341409742945874
+    band energy E_band=         8.341409742945874
+starting additional calculation in group 0
+time in energyContourIntegration = 7.617436 sec
+  before energy loop             = 0.000000 sec
+  in energy loop                 = 7.617436 sec
+    in calculateAllTauMatrices   = 2.936169 sec
+calculateChempot: xtws = 15.736104 zvaltss = 16.000000 tnen = 24.321976 old chempot = 0.680073
+           new chempot = 0.690923
+Total valence charge =    7.06608174659657439776
+Total valence charge =    7.06608174659657883865
+checkCharge :: Trouble! MT q = 246093802311506070551017782049787700202055400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000.00000000 qvalmt =       7.06608175
+checkCharge :: Trouble! MT q = 1202534627034637536388080082035430698227636000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000.00000000 qvalmt =       7.06608175
+
+ GETQM_MT:: r_sph charge,w             =    25.04983841801     0.00000000000     2.34692884426 1001    0
+            muffin-tin moment          =     2.41919276003
+
+ GENPOT / calculateLocalCharges: 
+ Total charge and moment in W-S cell:
+ qtotws =     26.00000000001
+ mtotws =      2.40381752748
+
+ GETQM_MT:: r_sph charge,w             =    25.04983841801     0.00000000000     2.34692884426 1001    0
+            muffin-tin moment          =     2.41919276003
+
+ GENPOT / calculateLocalCharges: 
+ Total charge and moment in W-S cell:
+ qtotws =     25.99999999999
+ mtotws =      2.40381752748
+Master: Rejected Walker 0 trial move.
+      1 steps remaining
+
+calculateCoreState 0.0
+
+ GETCOR:: Spin index                   =    1
+
+ CORSLV:: Eigenvalues:  n    l    k            energy
+                        1    0   -1     -0.5118919398081D+03
+                        2    0   -1     -0.5890180894448D+02
+                        2    1    1     -0.5068931991215D+02
+                        2    1   -2     -0.4977536517470D+02
+                        3    0   -1     -0.5733171691581D+01
+                        3    1    1     -0.3343344184570D+01
+                        3    1   -2     -0.3229186793076D+01
+          Energy     core:             = -0.72103380D+03
+          Energy semicore:             = -0.15534889D+02
+
+ GETCOR:: Spin index                   =    2
+
+ CORSLV:: Eigenvalues:  n    l    k            energy
+                        1    0   -1     -0.5118915035501D+03
+                        2    0   -1     -0.5880096982086D+02
+                        2    1    1     -0.5061289886538D+02
+                        2    1   -2     -0.4969691845275D+02
+                        3    0   -1     -0.5527182371488D+01
+                        3    1    1     -0.3143092636907D+01
+                        3    1   -2     -0.3030338435444D+01
+          Energy     core:             = -0.72069921D+03
+          Energy semicore:             = -0.14730952D+02
+
+ GETCOR:: Muffin-tin core charge       =   9.99999989169
+          Muffin-tin semicore charge   =   7.98375665896
+
+ GETCOR:: Muffin-tin core charge       =   9.99999989169
+          Muffin-tin semicore charge   =   7.98375665896
+          Muffin-tin core+semi moment  =   0.00107777905
+          Wigner-Seitz core+semi moment=   0.00000000016
+          Interstitial charge core     =   0.01624344935
+
+calculateCoreState 0.1
+
+ GETCOR:: Spin index                   =    1
+
+ CORSLV:: Eigenvalues:  n    l    k            energy
+                        1    0   -1     -0.5118919398081D+03
+                        2    0   -1     -0.5890180894448D+02
+                        2    1    1     -0.5068931991215D+02
+                        2    1   -2     -0.4977536517470D+02
+                        3    0   -1     -0.5733171691581D+01
+                        3    1    1     -0.3343344184570D+01
+                        3    1   -2     -0.3229186793076D+01
+          Energy     core:             = -0.72103380D+03
+          Energy semicore:             = -0.15534889D+02
+
+ GETCOR:: Spin index                   =    2
+
+ CORSLV:: Eigenvalues:  n    l    k            energy
+                        1    0   -1     -0.5118915035501D+03
+                        2    0   -1     -0.5880096982086D+02
+                        2    1    1     -0.5061289886538D+02
+                        2    1   -2     -0.4969691845275D+02
+                        3    0   -1     -0.5527182371488D+01
+                        3    1    1     -0.3143092636907D+01
+                        3    1   -2     -0.3030338435444D+01
+          Energy     core:             = -0.72069921D+03
+          Energy semicore:             = -0.14730952D+02
+
+ GETCOR:: Muffin-tin core charge       =   9.99999989169
+          Muffin-tin semicore charge   =   7.98375665896
+
+ GETCOR:: Muffin-tin core charge       =   9.99999989169
+          Muffin-tin semicore charge   =   7.98375665896
+          Muffin-tin core+semi moment  =   0.00107777905
+          Wigner-Seitz core+semi moment=   0.00000000016
+          Interstitial charge core     =   0.01624344935
+** Energy Contour Integration **
+Energy Contour Parameters: grid=2 npts=31, ebot=-0.300000 etop=0.690923 eibot=0.002500 eitop=0.825000
+timeSingleScatteres = 1.113064 sec
+received energy E_tot =         8.341537216393235
+    band energy E_band=         8.341537216393235
+starting additional calculation in group 0
+Master: Rejected Walker 0 trial move.
+      0 steps remaining
+time in energyContourIntegration = 4.431253 sec
+  before energy loop             = 0.001000 sec
+  in energy loop                 = 4.430254 sec
+    in calculateAllTauMatrices   = 1.657095 sec
+calculateChempot: xtws = 15.974384 zvaltss = 16.000000 tnen = 21.619258 old chempot = 0.690923
+           new chempot = 0.692108
+Total valence charge =    7.06474877582057025904
+Total valence charge =    7.06474877582057203540
+checkCharge :: Trouble! MT q =       7.06608173 qvalmt =       7.06474878
+checkCharge :: Trouble! MT q =       7.06608173 qvalmt =       7.06474878
+
+ GETQM_MT:: r_sph charge,w             =    25.04850544764     0.00000000000     2.34692884426 1001    0
+            muffin-tin moment          =     2.41699090255
+
+ GENPOT / calculateLocalCharges: 
+ Total charge and moment in W-S cell:
+ qtotws =     26.00000000001
+ mtotws =      2.40075711921
+
+ GETQM_MT:: r_sph charge,w             =    25.04850544764     0.00000000000     2.34692884426 1001    0
+            muffin-tin moment          =     2.41699090255
+
+ GENPOT / calculateLocalCharges: 
+ Total charge and moment in W-S cell:
+ qtotws =     25.99999999999
+ mtotws =      2.40075711921
+
+calculateCoreState 0.0
+
+ GETCOR:: Spin index                   =    1
+
+ CORSLV:: Eigenvalues:  n    l    k            energy
+                        1    0   -1     -0.5118919398081D+03
+                        2    0   -1     -0.5890180894448D+02
+                        2    1    1     -0.5068931991215D+02
+                        2    1   -2     -0.4977536517470D+02
+                        3    0   -1     -0.5733171691581D+01
+                        3    1    1     -0.3343344184570D+01
+                        3    1   -2     -0.3229186793076D+01
+          Energy     core:             = -0.72103380D+03
+          Energy semicore:             = -0.15534889D+02
+
+ GETCOR:: Spin index                   =    2
+
+ CORSLV:: Eigenvalues:  n    l    k            energy
+                        1    0   -1     -0.5118915035501D+03
+                        2    0   -1     -0.5880096982086D+02
+                        2    1    1     -0.5061289886538D+02
+                        2    1   -2     -0.4969691845275D+02
+                        3    0   -1     -0.5527182371488D+01
+                        3    1    1     -0.3143092636907D+01
+                        3    1   -2     -0.3030338435444D+01
+          Energy     core:             = -0.72069921D+03
+          Energy semicore:             = -0.14730952D+02
+
+ GETCOR:: Muffin-tin core charge       =   9.99999989169
+          Muffin-tin semicore charge   =   7.98375665896
+
+ GETCOR:: Muffin-tin core charge       =   9.99999989169
+          Muffin-tin semicore charge   =   7.98375665896
+          Muffin-tin core+semi moment  =   0.00107777905
+          Wigner-Seitz core+semi moment=   0.00000000016
+          Interstitial charge core     =   0.01624344935
+
+calculateCoreState 0.1
+
+ GETCOR:: Spin index                   =    1
+
+ CORSLV:: Eigenvalues:  n    l    k            energy
+                        1    0   -1     -0.5118919398081D+03
+                        2    0   -1     -0.5890180894448D+02
+                        2    1    1     -0.5068931991215D+02
+                        2    1   -2     -0.4977536517470D+02
+                        3    0   -1     -0.5733171691581D+01
+                        3    1    1     -0.3343344184570D+01
+                        3    1   -2     -0.3229186793076D+01
+          Energy     core:             = -0.72103380D+03
+          Energy semicore:             = -0.15534889D+02
+
+ GETCOR:: Spin index                   =    2
+
+ CORSLV:: Eigenvalues:  n    l    k            energy
+                        1    0   -1     -0.5118915035501D+03
+                        2    0   -1     -0.5880096982086D+02
+                        2    1    1     -0.5061289886538D+02
+                        2    1   -2     -0.4969691845275D+02
+                        3    0   -1     -0.5527182371488D+01
+                        3    1    1     -0.3143092636907D+01
+                        3    1   -2     -0.3030338435444D+01
+          Energy     core:             = -0.72069921D+03
+          Energy semicore:             = -0.14730952D+02
+
+ GETCOR:: Muffin-tin core charge       =   9.99999989169
+          Muffin-tin semicore charge   =   7.98375665896
+
+ GETCOR:: Muffin-tin core charge       =   9.99999989169
+          Muffin-tin semicore charge   =   7.98375665896
+          Muffin-tin core+semi moment  =   0.00107777905
+          Wigner-Seitz core+semi moment=   0.00000000016
+          Interstitial charge core     =   0.01624344935
+** Energy Contour Integration **
+Energy Contour Parameters: grid=2 npts=31, ebot=-0.300000 etop=0.692108 eibot=0.002500 eitop=0.825000
+timeSingleScatteres = 1.133065 sec
+time in energyContourIntegration = 4.092234 sec
+  before energy loop             = 0.001000 sec
+  in energy loop                 = 4.091234 sec
+    in calculateAllTauMatrices   = 1.636094 sec
+calculateChempot: xtws = 15.998721 zvaltss = 16.000000 tnen = 21.371085 old chempot = 0.692108
+           new chempot = 0.692168
+Total valence charge =    7.06467120554769500984
+checkCharge :: Trouble! MT q =       7.06474874 qvalmt =       7.06467121
+Total valence charge =    7.06467120554769856255
+checkCharge :: Trouble! MT q =       7.06474874 qvalmt =       7.06467121
+
+ GETQM_MT:: r_sph charge,w             =    25.04842787740     0.00000000000     2.34692884426 1001    0
+            muffin-tin moment          =     2.41695542432
+
+ GENPOT / calculateLocalCharges: 
+ Total charge and moment in W-S cell:
+ qtotws =     26.00000000001
+ mtotws =      2.40065859126
+
+ GETQM_MT:: r_sph charge,w             =    25.04842787740     0.00000000000     2.34692884426 1001    0
+            muffin-tin moment          =     2.41695542432
+
+ GENPOT / calculateLocalCharges: 
+ Total charge and moment in W-S cell:
+ qtotws =     25.99999999999
+ mtotws =      2.40065859126
+received energy E_tot =         8.341537982854437
+    band energy E_band=         8.341537982854437
+Walker 0: Exiting simulation.
+Wang-Landau walker 0 performed 3 energy contour integrations.
+Ctrl-C caught... cleaning up processes

@@ -1,0 +1,27 @@
+# lsmswl: Wang-Landau Sampling
+# process id: 13476
+# mpi enabled: 1
+# mpi nproc: 3
+# start time: Tue Oct 13 14:00:51 2015
+# write time: Tue Oct 13 14:00:51 2015
+# wall time: 0 seconds
+# process time: 3.041 seconds
+# resident memory = 125184 KBytes
+help= 0
+verbose= 0
+input= 
+output= ProgramOptionsOut.txt
+num_lsms= 2
+size_lsms= 2
+align= 1
+num_steps= 4
+initial_steps= 0
+walltime= -1
+ilsms= i_lsms
+random_dir= 0
+step_out= steps.txt
+wl_out= 
+wl_int= 
+mode= 
+energy_calc= 
+config_space= 
