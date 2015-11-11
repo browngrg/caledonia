@@ -1,0 +1,34 @@
+# caledonia: Monte Carlo simulations
+# process id: 11668
+# mpi enabled: 1
+# mpi nproc: 1
+# start time: Tue Oct 20 14:16:24 2015
+# write time: Tue Oct 20 14:21:13 2015
+# wall time: 289 seconds
+# process time: 288.112 seconds
+# resident memory = 7800 KBytes
+help= 0
+verbose= 1
+input= 
+output= ProgramOptionsOut.txt
+model= ising
+sim= wanglandau
+dim= 2
+length= 32
+jsign= 1
+H= 0
+A= 0
+Elo= -2050
+Ehi= 2050
+Ebin= 4
+numwin= 1
+numwalk= 5
+overlap= 0.75
+nstep= 1000
+maxupdate= 16
+dosinterp= 0
+wleta= 0
+wlgamma= 1
+Q= 0.001
+dos= 
+movie= 1
