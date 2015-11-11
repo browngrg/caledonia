@@ -83,7 +83,15 @@ void CaledoniaDriver(ProgramOptions& options, int& argc, char* argv[])
 
 int main(int argc, char* argv[])
 {
-   const bool very_verbose = true;
+
+   //  Get basic MPI information
+   MPI_Struct world;
+#  ifdef USE_MPI
+   MPI_Init(&argc,&argv);
+   world = MPI_Struct::world();
+#  endif
+
+   const bool very_verbose = true && (world.iproc==0);
    time_t start_time_main;
    if( very_verbose )
    {
@@ -97,13 +105,6 @@ int main(int argc, char* argv[])
       if(true) pid = getpid();
       std::cout << "process id = " << pid << std::endl;
    }
-
-   //  Get basic MPI information
-   MPI_Struct world;
-#  ifdef USE_MPI
-   MPI_Init(&argc,&argv);
-   world = MPI_Struct::world();
-#  endif
 
    ProgramOptions options("caledonia","Monte Carlo simulations");
    char model_name[128] = "ising";
@@ -132,7 +133,6 @@ int main(int argc, char* argv[])
 #  ifdef USE_MPI
    MPI_Finalize();
 #  endif
-
 
    time_t stop_time_main;
    if( very_verbose )
