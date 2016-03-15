@@ -43,6 +43,8 @@ public:
    // Change the value of sigma_i at one grid point, update observables
    void change(Config& sigma, Heisenberg_Observables& macro, int ispin, double new_sigma[3]);
 
+   void change_field(Heisenberg_Observables& macro, float Hnew) { BASE::change_field(macro,Hnew); }
+
 public:
 
    std::string header() const 
@@ -140,7 +142,7 @@ void EHModel_Hamiltonian::init(bool verbose)
 
 void EHModel_Hamiltonian::calc_observable(Config& sigma, Heisenberg_Observables& macro)
 {
-   macro.H = H;
+   if( !use_walker_H ) macro.H = H;
    macro.V = nspin;
    double* S(&sigma[0]);            // Hiesenberg specific
    if( false )
@@ -181,19 +183,19 @@ void EHModel_Hamiltonian::calc_observable(Config& sigma, Heisenberg_Observables&
    E_N /= 2.;  // Double counted two-body interactions
    macro.E_N = -E_N;
    macro.E_K = -E_K;
-   macro.E_H = -mag[2]*H;
+   macro.E_H = -mag[2]*macro.H;
    for(int k=0; k<3; k++) macro.M3d[k] = mag[k];
    macro.Mmag2 = macro.M3d[0]*macro.M3d[0] + macro.M3d[1]*macro.M3d[1] + macro.M3d[2]*macro.M3d[2];
    macro.Mstag = stag;
    macro.E = macro.E_N + macro.E_K + macro.E_H;
    macro.X = std::sqrt(macro.Mmag2);
-   macro.M = (H==0)? macro.X : macro.M3d[2];
+   macro.M = macro.M3d[2];
 }
-
 
 
 void EHModel_Hamiltonian::change(EHModel_Hamiltonian::Config& sigma, Heisenberg_Observables& macro, int ispin, double new_sigma[3])
 {
+   if( !use_walker_H ) macro.H = H;
    double* S(&sigma[0]);
    // Calculate before
    int iptr = (nngbr+4)*ispin;
@@ -231,10 +233,10 @@ void EHModel_Hamiltonian::change(EHModel_Hamiltonian::Config& sigma, Heisenberg_
    // update
    macro.E_N = macro.E_N + (-1)*(E_N1-E_N0);   // minus sign in Hamiltonian
    macro.E_K = macro.E_K + (-1)*(E_K1-E_K0);
-   macro.E_H = -macro.M3d[2]*H;
+   macro.E_H = -macro.M3d[2]*macro.H;
    macro.E   = macro.E_N + macro.E_K + macro.E_H;
    macro.X   = std::sqrt(macro.Mmag2);
-   macro.M   = (H==0)? macro.X : macro.M3d[2];
+   macro.M   = macro.M3d[2];
    // check energy
    if( false ) {
       static int icount = 0;

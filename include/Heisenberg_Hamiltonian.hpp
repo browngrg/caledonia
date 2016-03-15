@@ -91,6 +91,7 @@ public:
    std::vector<double> stagmask;   // Encodes sublattice for staggered magnetization
  
    double H;                       // The Zeeman field
+   bool use_walker_H;              // If H is changing, need to store locally
 
 public:
 
@@ -106,7 +107,10 @@ public:
 
    // Change the value of sigma_i at one grid point, update observables
    virtual void change(Config& sigma, Heisenberg_Observables& macro, int ispin, double new_sigma[4]);
-    
+
+   // Change the value of the applied field
+   virtual void change_field(Heisenberg_Observables& macro, float Hnew);
+
    // Make an attempted Monte Carlo step
    template<typename MCWalker, typename URNG> void mc_step(MCWalker& walker, URNG& urng);
 
@@ -151,6 +155,7 @@ public:
 
 void Heisenberg_Hamiltonian::init(bool verbose) 
 {
+   use_walker_H = false;
    MPI = 4.*std::atan(1.);
    int lda[DIM+1];
    lda[0] = 1;
@@ -204,14 +209,14 @@ void Heisenberg_Hamiltonian::add_options(OPTIONS& options)
 {
    options.add_option("length", "length of side",         'L', &L);
    options.add_option("H", "magnitude of magnetic field", 'H', &H);
-
+   options.add_option("stepsize", "size along spin", ' ', &step_size);
 }
  
 
 void Heisenberg_Hamiltonian::calc_observable(Heisenberg_Hamiltonian::Config& sigma, Heisenberg_Observables& macro)
 {
+   if( !use_walker_H ) macro.H = H;
    macro.V = nspin;
-   macro.H = H;
    double* S(&sigma[0]);            // Hiesenberg specific
    if( false )
    {
@@ -240,13 +245,13 @@ void Heisenberg_Hamiltonian::calc_observable(Heisenberg_Hamiltonian::Config& sig
    for(int ispin=0; ispin<nspin; ispin++) 
       stag += stagmask[ispin]*S[3*ispin+2]; // stagmask[ispin]*( mag[0]*S[3*ispin+0] + mag[1]*S[3*ispin+1] + mag[2]*S[3*ispin+2] );
    macro.E_N = -net;
-   macro.E_H = -mag[2]*H;
+   macro.E_H = -mag[2]*macro.H;
    for(int k=0; k<3; k++) macro.M3d[k] = mag[k];
    macro.Mmag2 = macro.M3d[0]*macro.M3d[0] + macro.M3d[1]*macro.M3d[1] + macro.M3d[2]*macro.M3d[2];
    macro.Mstag = stag;
    macro.E = macro.E_N + macro.E_H;
    macro.X = std::sqrt(macro.Mmag2);
-   macro.M = (H==0)? macro.X : macro.M3d[2];
+   macro.M = (macro.H==0)? macro.X : macro.M3d[2];
 }
 
 
@@ -342,8 +347,19 @@ void Heisenberg_Hamiltonian::mc_step(MCWalker& walker, URNG& urng)
 }
 
 
+void Heisenberg_Hamiltonian::change_field(Heisenberg_Observables& macro, float Hnew)
+{
+   use_walker_H = true;
+   macro.H = Hnew;
+   macro.E -= macro.E_H;
+   macro.E_H = -macro.M3d[2]*macro.H;
+   macro.E += macro.E_H;
+}
+
+
 void Heisenberg_Hamiltonian::change(Heisenberg_Hamiltonian::Config& sigma, Heisenberg_Observables& macro, int ispin, double new_sigma[3])
 {
+   if( !use_walker_H ) macro.H = H;
    double* S(&sigma[0]);
    // Calculate before
    double E0 = 0;
@@ -366,10 +382,10 @@ void Heisenberg_Hamiltonian::change(Heisenberg_Hamiltonian::Config& sigma, Heise
           + -S[3*ispin+2]*S[3*jspin[2*DIM*ispin+k]+2];
    // update
    macro.E_N = macro.E_N + (E1-E0);
-   macro.E_H = -macro.M3d[2]*H;
+   macro.E_H = -macro.M3d[2]*macro.H;
    macro.E   = macro.E_N + macro.E_H;
    macro.X   = std::sqrt(macro.Mmag2);
-   macro.M   = (H==0)? macro.X : macro.M3d[2];
+   macro.M   = (macro.H==0)? macro.X : macro.M3d[2];
    // check energy
    if( false ) {
       static int icount = 0;
