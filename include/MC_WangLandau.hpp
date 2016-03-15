@@ -145,6 +145,9 @@ public:
    double wleta;                       // weighting between WL and ITTM. See Eq. (24) of
                                        // RG Ghulghazaryan, S. Hayryan, CK Hu, J Comp Chem 28,  715-726 (2007)
    bool convh;                         // Converge via ln(g_i+1) = ln(g_i) + ln(h_i) when wlgamma = 0;
+   bool one_pow_t;                     // Power-law exponent for V/t^pow convergence of gamma
+   int  autoS;                         // Autocorrelation suppression S from C. Zhou and R.N. Bhatt PRE 72, 025701(R) (2005)
+
    bool output_configs;
    bool make_movie;                    // Number files by iloop instead of iupdate
 
@@ -206,6 +209,8 @@ MC_WangLandau::MC_WangLandau()
    output_configs = false;
    Qquit    = 1.e-4;
    wlgamma_start = 1.;
+   one_pow_t = 0;
+   autoS    = 0;
    wleta    = 0;
    convh    = false;
    re_iter  = 0;
@@ -233,6 +238,8 @@ void MC_WangLandau::add_options(OPTIONS& options)
    this->MaxUpdate = 16;
    this->wleta = 0;
    this->wlgamma_start = 1;
+   this->one_pow_t = 0;
+   this->autoS = 0;
    this->Qquit = 0.10;
    this->make_movie = false;
    lng_est_fn[0]=0;
@@ -247,6 +254,8 @@ void MC_WangLandau::add_options(OPTIONS& options)
    options.add_option( "dosinterp","linear interpolation of dos",   ' ', &(this->LinearInterp));
    options.add_option( "wleta",    "weighting between WL and ITTM", ' ', &(this->wleta));
    options.add_option( "wlgamma",  "starting value of WL parameter",' ', &(this->wlgamma_start));
+   options.add_option( "onepowt",  "exponent for power law gamma",  ' ', &(this->one_pow_t));
+   options.add_option( "autoS",    "autocorrelation Suppression",   ' ', &(this->autoS));
    options.add_option( "Q",        "target convergence factor",     ' ', &(this->Qquit));
    options.add_option( "dos",      "dos file to use in sampling",   ' ', lng_est_fn);
    options.add_option( "movie",    "use iloop to number output",    ' ', &(this->make_movie));
@@ -450,6 +459,7 @@ void MC_WangLandau::DoWangLandau(Model& model, Walker& walker, long long nstep, 
       for(int ibin=0; ibin<walker.Sfixed.size(); ibin++)
          walker.Sfixed[ibin] = 0;
    }
+   int iautoS = 0;
    double wlgamma = walker.wlgamma;
    int ibin = walker.bin();                                            // _C and _PD depend on bin
    walker.wl_now.Sval = walker.get_lndos(walker.now.E,LinearInterp);  
@@ -491,17 +501,24 @@ void MC_WangLandau::DoWangLandau(Model& model, Walker& walker, long long nstep, 
       double deltaS = walker.wl_now.Sval - walker.wl_old.Sval;
       bool accept = inwall && ( (deltaS<=0) || (urng()<exp(-deltaS)) ); 
       if( !accept ) walker.restore_initial();
-      walker.imcs++;
-      // The Wang-Landau histogram and update
-      if( inwall )
+      iautoS++;
+      if( iautoS>=autoS )
       {
-         ibin = walker.bin();             // sets walker.wl_now.ibin also
-         walker.h[ibin]++;
-         walker.wl_now.Sval += wlgamma;   // Need to update both
-         walker.S[ibin] += wlgamma;
-         measure.add_sample(walker,wlgamma==0);   
+         iautoS = 0;
+         walker.imcs++;
+         // The Wang-Landau histogram and update
+         if( inwall )
+         {
+            if( one_pow_t>=1 ) wlgamma = wlgamma_start/std::pow(static_cast<double>(walker.imcs)/walker.now.V,1./one_pow_t);
+            ibin = walker.bin();             // sets walker.wl_now.ibin also
+            walker.h[ibin]++;
+            walker.wl_now.Sval += wlgamma;   // Need to update both
+            walker.S[ibin] += wlgamma;
+            measure.add_sample(walker,wlgamma==0);   
+         }
       }
    }
+   walker.wlgamma = wlgamma;
    walker.MCSS = static_cast<double>(walker.imcs)/walker.now.V;
    if(verbose) std::cout << __FILE__ << ":" << __LINE__ << std::endl;
 }
@@ -994,7 +1011,7 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
             int istart = global_walker.window.bin(Ewin[1*iwin+0]);
             for(int ibin=0; ibin<walkerpool[iwalk].S.size(); ibin++)
                walkerpool[iwalk].S[ibin]  = (1.-wleta)*global_walker.S[istart+ibin]+wleta*(global_walker.Sittm[istart+ibin]-walkerpool[iwalk].Sfixed[ibin]);
-            walkerpool[iwalk].wlgamma /= 2;
+            if( one_pow_t<1 ) walkerpool[iwalk].wlgamma /= 2;
          }
          fvisit = 0;
          WLQold = 0;
