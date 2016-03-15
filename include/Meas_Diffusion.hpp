@@ -68,7 +68,7 @@ void Meas_Diffusion::init(float Emin, float Emax, float _Ebin)
 
 template<typename SIMULATION> void Meas_Diffusion::init(SIMULATION& sim)
 {
-   this->init(sim.Elo,sim.Ehi,sim.Ehi);
+   this->init(sim.Elo,sim.Ehi,sim.Ebin);
 }
 
 
@@ -134,5 +134,6 @@ void Meas_Diffusion::write()
          fprintf(fout,"\n");
       }
    }
+   fclose(fout);
 }
 #endif 
