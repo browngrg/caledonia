@@ -147,6 +147,7 @@ public:
    bool convh;                         // Converge via ln(g_i+1) = ln(g_i) + ln(h_i) when wlgamma = 0;
    bool one_pow_t;                     // Power-law exponent for V/t^pow convergence of gamma
    int  autoS;                         // Autocorrelation suppression S from C. Zhou and R.N. Bhatt PRE 72, 025701(R) (2005)
+   bool zhou_autoS;                    // Chengang Zhou autocorrelation S? true means update iautoS regardless of WL accept
 
    bool output_configs;
    bool make_movie;                    // Number files by iloop instead of iupdate
@@ -209,18 +210,19 @@ MC_WangLandau::MC_WangLandau()
    output_configs = false;
    Qquit    = 1.e-4;
    wlgamma_start = 1.;
-   one_pow_t = 0;
-   autoS    = 0;
-   wleta    = 0;
-   convh    = false;
-   re_iter  = 0;
+   one_pow_t  = 0;
+   autoS      = 0;
+   zhou_autoS = false;
+   wleta      = 0;
+   convh      = false;
+   re_iter    = 0;
    LinearInterp = true;
-   Elo      = +std::numeric_limits<double>::max();         // Elo,Ehi,Ebin,nbin, and fwinover depend on each other
-   Ehi      = -std::numeric_limits<double>::max();
-   Ebin     = 1.;
-   fwinover = 0.5;                                         // fractional overlap, maximal for M/(M+1)
-   kTlo     = 0.5;
-   kThi     = 5.0;
+   Elo        = +std::numeric_limits<double>::max();         // Elo,Ehi,Ebin,nbin, and fwinover depend on each other
+   Ehi        = -std::numeric_limits<double>::max();
+   Ebin       = 1.;
+   fwinover   = 0.5;                                         // fractional overlap, maximal for M/(M+1)
+   kTlo       = 0.5;
+   kThi       = 5.0;
    at_wall_limit = false;
    wall_limit = 24*60*60;
    lng_est_fn[0]=0;
@@ -240,6 +242,7 @@ void MC_WangLandau::add_options(OPTIONS& options)
    this->wlgamma_start = 1;
    this->one_pow_t = 0;
    this->autoS = 0;
+   this->zhou_autoS = false;
    this->Qquit = 0.10;
    this->make_movie = false;
    lng_est_fn[0]=0;
@@ -256,6 +259,7 @@ void MC_WangLandau::add_options(OPTIONS& options)
    options.add_option( "wlgamma",  "starting value of WL parameter",' ', &(this->wlgamma_start));
    options.add_option( "onepowt",  "exponent for power law gamma",  ' ', &(this->one_pow_t));
    options.add_option( "autoS",    "autocorrelation Suppression",   ' ', &(this->autoS));
+   options.add_option( "ZhouautoS","update autoS count every step", ' ', &(this->zhou_autoS));
    options.add_option( "Q",        "target convergence factor",     ' ', &(this->Qquit));
    options.add_option( "dos",      "dos file to use in sampling",   ' ', lng_est_fn);
    options.add_option( "movie",    "use iloop to number output",    ' ', &(this->make_movie));
@@ -496,12 +500,11 @@ void MC_WangLandau::DoWangLandau(Model& model, Walker& walker, long long nstep, 
          }
       }
       walker.wl_now.Sval = walker.get_lndos(walker.now.E,LinearInterp);
-      ittm.add_sample(walker); 
       // A tolerant way to find acceptance vs rejection
       double deltaS = walker.wl_now.Sval - walker.wl_old.Sval;
       bool accept = inwall && ( (deltaS<=0) || (urng()<exp(-deltaS)) ); 
       if( !accept ) walker.restore_initial();
-      iautoS++;
+      if( accept || zhou_autoS ) iautoS++;
       if( iautoS>=autoS )
       {
          iautoS = 0;
@@ -516,6 +519,8 @@ void MC_WangLandau::DoWangLandau(Model& model, Walker& walker, long long nstep, 
             walker.S[ibin] += wlgamma;
             measure.add_sample(walker,wlgamma==0);   
          }
+         // Update the Infinite-temperature transition matrix
+         ittm.add_sample(walker); 
       }
    }
    walker.wlgamma = wlgamma;
