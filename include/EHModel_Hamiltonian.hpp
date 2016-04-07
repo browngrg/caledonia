@@ -33,6 +33,8 @@ public:
 
 public:
 
+   // jspin[offset+nindex] comes from the base class
+   enum { KRECSIZE = 9 };          // Storage space of anisotropy information (symmetry, K, K', dir1, dir2)
    int nngbr;                      // Number of neighbors per spin
    std::vector<double> KiJij;      // Array of exchange constants and anisotropy information
    std::vector<double> moment;     // Magnetic moment of each atom
@@ -65,6 +67,10 @@ public:
    std::vector<std::string> filetypes;
    void read_pairs(std::string filename);
    void write_KiJij(std::string filename);
+
+   double calc_Ki(Config& sigma, int ispin);
+
+   void map_energy(std::string filename="EHModelEnergyMap.csv");
 
 };
 
@@ -126,17 +132,99 @@ void EHModel_Hamiltonian::init(bool verbose)
       std::cout << "Using simple Heisenberg model for Hamiltonian" << std::endl;
       this->BASE::init(verbose);
       nngbr = 2*BASE::DIM;
-      KiJij.resize( nspin*(nngbr+4) );
+      KiJij.resize( nspin*(nngbr+KRECSIZE) );
       for(int ispin=0; ispin<nspin; ispin++)
       {
-         KiJij[ispin*(nngbr+4)+0] = 0;  // Khat_x
-         KiJij[ispin*(nngbr+4)+1] = 0;
-         KiJij[ispin*(nngbr+4)+2] = 0;
-         KiJij[ispin*(nngbr+4)+3] = 0;  // |Ki|
+         KiJij[ispin*(nngbr+KRECSIZE)+0] = 0;  // type = none
+         KiJij[ispin*(nngbr+KRECSIZE)+1] = 0;  // K1
+         KiJij[ispin*(nngbr+KRECSIZE)+2] = 0;  // K2
+         KiJij[ispin*(nngbr+KRECSIZE)+3] = 0;  // Kdir1
+         KiJij[ispin*(nngbr+KRECSIZE)+4] = 0;
+         KiJij[ispin*(nngbr+KRECSIZE)+5] = 0;
+         KiJij[ispin*(nngbr+KRECSIZE)+6] = 0;  // Kdir2
+         KiJij[ispin*(nngbr+KRECSIZE)+7] = 0;
+         KiJij[ispin*(nngbr+KRECSIZE)+8] = 0;
          for(int j=0; j<nngbr; j++)
-            KiJij[ispin*(nngbr+4)+4+j] = 1;
+            KiJij[ispin*(nngbr+KRECSIZE)+KRECSIZE+j] = 1;
       }
    } 
+}
+
+/* *  Calculate the magnetic anisotropy energy of site i
+   *
+   *  The energy for uniaxial anisotropy is given by
+   *  \f[ E_{{\rm u},i} = K_i (1 - (\hat{e}_i \cdot \hat{s}_i)^2) \f]
+   *  where <I>K<SUB>i</SUB></I> is the strength of the anisotropy,
+   *  \f$\hat{e}_i\f$ is the axis of the anisotropy, and 
+   *  \f$\hat{s}_i\f$ is the direction of the <I>i</I>-th spin.
+   *
+   *  The energy for square anisotropy is given by
+   *  \f[ E_{{\rm s},i} = K_i ( (\hat{e}_{1,i} \cdot \hat{s}_i)^2
+   *                           +(\hat{e}_{2,i} \cdot \hat{s}_i)^2 )
+   *                     + K'_i (\hat{e}_{1,i} \cdot \hat{s}_i)^2
+   *                            (\hat{e}_{2,i} \cdot \hat{s}_i)^2
+   *  \f]
+   *  where <I>K<SUB>i</SUB></I> and <I>K'<SUB>i</SUB></I> together 
+   *  describe the strength of the anisotropy and 
+   *  \f$hat{e}_{1,i}\f$ and \f$\hat{e}_{2,i}\f$ describe its axes. 
+   *
+   *  The energy for cubic anisotropy is given by
+   *  \f[ E_{{\rm c},i} = K_i ( (\hat{e}_{1,i} \cdot \hat{s}_i)^2
+   *                           +(\hat{e}_{2,i} \cdot \hat{s}_i)^2 
+   *                           +(\hat{e}_{3,i} \cdot \hat{s}_i)^2 )
+   *                     + K'_i (\hat{e}_{1,i} \cdot \hat{s}_i)^2
+   *                            (\hat{e}_{2,i} \cdot \hat{s}_i)^2
+   *                            (\hat{e}_{3,i} \cdot \hat{s}_i)^2
+   *  \f]
+   *  where <I>K<SUB>i</SUB></I> and <I>K'<SUB>i</SUB></I> together 
+   *  describe the strength of the anisotropy and 
+   *  \f$hat{e}_{1,i}\f$, \f$\hat{e}_{2,i}\f$, and \f$\hat{e}_{3,i}\f$ 
+   *  describe its axes. It is assumed that the three axes are mutually
+   *  orthogonal, so only two of them actually need to be specified. 
+   *  The direction of the third can be calculated.
+   */
+double EHModel_Hamiltonian::calc_Ki(Config& sigma, int ispin)
+{
+   double Ek = 0;
+   double a1sqr,a2sqr,a3sqr;
+   double* Krec = &(KiJij[ispin*(nngbr+KRECSIZE)]);   // atype, K1, K2, Kdir1, Kdir2
+   int atype = static_cast<int>(Krec[0]);
+   switch(atype) {
+   case 0:
+      // no anisotropy
+      break;
+   case 1:
+      // uniaxial anisotropy
+      a1sqr = 0;
+      for(int j=0; j<3; j++) a1sqr += sigma[3*ispin+j]*Krec[3+j];  // S*Kdir1
+      a1sqr *= a1sqr;                                              // (S*Kdir1)^2
+      Ek = Krec[1]*(1.-a1sqr);                                     // K*[1-(S*Kdir1)^2]
+      break;
+   case 2:
+      // square anisotropy
+      a1sqr = 0;
+      for(int j=0; j<3; j++) a1sqr += sigma[3*ispin+j]*Krec[3+j];  // S*Kdir1
+      a1sqr *= a1sqr;
+      a2sqr = 0;
+      for(int j=0; j<3; j++) a2sqr += sigma[3*ispin+j]*Krec[6+j];  // S*Kdir2
+      a2sqr *= a2sqr;
+      Ek = Krec[1]*(a1sqr+a2sqr) + Krec[2]*a1sqr*a2sqr;            // K1*[ (S*K1)^2 + (S*K2)^2 ] + K2*(S*K1)^2*(S*K2)^2
+      break;
+   case 3:
+      // cubic anisotropy
+      a1sqr = 0;
+      for(int j=0; j<3; j++) a1sqr += sigma[3*ispin+j]*Krec[3+j];  // S*Kdir1
+      a1sqr *= a1sqr;
+      a2sqr = 0;
+      for(int j=0; j<3; j++) a2sqr += sigma[3*ispin+j]*Krec[6+j];  // S*Kdir2
+      a2sqr *= a2sqr;
+      a3sqr = 1. - a1sqr - a2sqr;                                  // dot product of two unit vectors
+      Ek = Krec[1]*(a1sqr*a2sqr+a2sqr*a3sqr+a3sqr*a1sqr) + Krec[2]*a1sqr*a2sqr*a3sqr;
+      break;
+   default:
+      std::cout << __FILE__ << ":" << __LINE__ << " Error anisotropy type " << atype << " not recognized" << std::endl;
+   }
+   return Ek;
 }
 
 
@@ -161,17 +249,14 @@ void EHModel_Hamiltonian::calc_observable(Config& sigma, Heisenberg_Observables&
    double E_K = 0;
    double mag[3] = { 0, 0, 0 };
    double stag = 0;
-   int iptr = 0;
    for(int ispin=0; ispin<nspin; ispin++) 
    {
       // increment global magnetization
       for(int j=0; j<3; j++) mag[j] += moment[ispin]*S[3*ispin+j];
       stag += stagmask[ispin]*moment[ispin]*S[3*ispin+2];
-      // calculate anisotropy energy KiJij[kx,ky,kz,Kmag]
-      double sdotk = 0;
-      for(int j=0; j<3; j++) sdotk += S[3*ispin+j]*KiJij[iptr++];
-      E_K += KiJij[iptr++]*sdotk;
+      E_K += calc_Ki(sigma,ispin);
       // calculate exchange energy
+      int iptr = (nngbr+KRECSIZE)*ispin + KRECSIZE;
       for(int j=0; j<nngbr; j++) 
       {
             E_N += KiJij[iptr++]
@@ -182,7 +267,7 @@ void EHModel_Hamiltonian::calc_observable(Config& sigma, Heisenberg_Observables&
    }
    E_N /= 2.;  // Double counted two-body interactions
    macro.E_N = -E_N;
-   macro.E_K = -E_K;
+   macro.E_K =  E_K;
    macro.E_H = -mag[2]*macro.H;
    for(int k=0; k<3; k++) macro.M3d[k] = mag[k];
    macro.Mmag2 = macro.M3d[0]*macro.M3d[0] + macro.M3d[1]*macro.M3d[1] + macro.M3d[2]*macro.M3d[2];
@@ -198,11 +283,9 @@ void EHModel_Hamiltonian::change(EHModel_Hamiltonian::Config& sigma, Heisenberg_
    if( !use_walker_H ) macro.H = H;
    double* S(&sigma[0]);
    // Calculate before
-   int iptr = (nngbr+4)*ispin;
-   double sdotk = 0;
-   for(int j=0; j<3; j++) sdotk += S[3*ispin+j]*KiJij[iptr++];
-   double E_K0 = KiJij[iptr++]*sdotk;
+   double E_K0 = calc_Ki(sigma,ispin);
    double E_N0 = 0;
+   int iptr = (nngbr+KRECSIZE)*ispin + KRECSIZE;
    for(int j=0; j<nngbr; j++) 
    {
          E_N0 += KiJij[iptr++]
@@ -217,11 +300,10 @@ void EHModel_Hamiltonian::change(EHModel_Hamiltonian::Config& sigma, Heisenberg_
    // Calculate after
    for(int k=0; k<3; k++)  macro.M3d[k] += moment[ispin]*S[3*ispin+k];
    macro.Mmag2 = macro.M3d[0]*macro.M3d[0] + macro.M3d[1]*macro.M3d[1] + macro.M3d[2]*macro.M3d[2];
-   iptr = (nngbr+4)*ispin;
-   sdotk = 0;
-   for(int j=0; j<3; j++) sdotk += S[3*ispin+j]*KiJij[iptr++];
-   double E_K1 = KiJij[iptr++]*sdotk;
+   iptr = (nngbr+KRECSIZE)*ispin;
+   double E_K1 = calc_Ki(sigma,ispin);
    double E_N1 = 0;
+   iptr = (nngbr+KRECSIZE)*ispin + KRECSIZE;
    for(int j=0; j<nngbr; j++) 
    {
          E_N1 += KiJij[iptr++]
@@ -229,10 +311,10 @@ void EHModel_Hamiltonian::change(EHModel_Hamiltonian::Config& sigma, Heisenberg_
              +   S[3*(ispin)+1]*S[3*jspin[nngbr*ispin+j]+1] 
              +   S[3*(ispin)+2]*S[3*jspin[nngbr*ispin+j]+2] );
    }
-   macro.Mstag += stagmask[ispin]*S[3*ispin+2];
+   macro.Mstag += stagmask[ispin]*moment[ispin]*S[3*ispin+2];
    // update
    macro.E_N = macro.E_N + (-1)*(E_N1-E_N0);   // minus sign in Hamiltonian
-   macro.E_K = macro.E_K + (-1)*(E_K1-E_K0);
+   macro.E_K = macro.E_K +      (E_K1-E_K0);
    macro.E_H = -macro.M3d[2]*macro.H;
    macro.E   = macro.E_N + macro.E_K + macro.E_H;
    macro.X   = std::sqrt(macro.Mmag2);
@@ -250,7 +332,7 @@ void EHModel_Hamiltonian::change(EHModel_Hamiltonian::Config& sigma, Heisenberg_
             std::cout << __FILE__ << ":" << __LINE__ << " change E != direct E (icount=" << icount << ")" << std::endl;
             std::cout << "E     = " << macro.E << ", " << direct.E << " diff=" << macro.E - direct.E << std::endl;
             std::cout << "E_N   = " << macro.E_N << ", " << direct.E_N << " diff=" << macro.E_N - direct.E_N << std::endl;
-            std::cout << "E_K   = " << macro.E_N << ", " << direct.E_N << " diff=" << macro.E_N - direct.E_N << std::endl;
+            std::cout << "E_K   = " << macro.E_K << ", " << direct.E_K << " diff=" << macro.E_K - direct.E_K << std::endl;
             std::cout << "E_H   = " << macro.E_H << ", " << direct.E_H << " diff=" << macro.E_H - direct.E_H << std::endl;
             std::cout << "Mmag2 = " << macro.Mmag2 << ", " << direct.Mmag2 << " diff=" << macro.Mmag2 - direct.Mmag2 << std::endl;
             std::cout << "Mstag = " << macro.Mstag << ", " << direct.Mstag << " diff=" << macro.Mstag - direct.Mstag << std::endl;
@@ -290,7 +372,7 @@ void EHModel_Hamiltonian::read_pairs(std::string filename)
                       << "invalid number of pairs for first spin. npair=" << npair << std::endl;
             return;
          }
-         KiJij.resize( nspin*(nngbr+4) ); std::fill(KiJij.begin(),KiJij.end(),0.);
+         KiJij.resize( nspin*(nngbr+KRECSIZE) ); std::fill(KiJij.begin(),KiJij.end(),0.);
          jspin.resize( nspin*nngbr );     std::fill(jspin.begin(),jspin.end(),-1);
       }
       if( npair<0 || npair>nngbr )
@@ -303,7 +385,7 @@ void EHModel_Hamiltonian::read_pairs(std::string filename)
       for(int ipair=0; ipair<npair; ipair++)
       {
          int rank;
-         fin >> jspin[index*nngbr+ipair] >> rank >> KiJij[index*(nngbr+4)+4+ipair];
+         fin >> jspin[index*nngbr+ipair] >> rank >> KiJij[index*(nngbr+KRECSIZE)+KRECSIZE+ipair];
          if( rank!=1 )
          {
             std::cerr << __FILE__ << ":" << __LINE__ << " EHModel_Hamiltonian::read_pairs" << std::endl
@@ -323,17 +405,60 @@ void EHModel_Hamiltonian::write_KiJij(std::string filename)
    std::ofstream fout(filename.c_str());
    fout << "# EHModel KiJij output" << std::endl;
    fout << "# nspin numneighbor" << std::endl;
-   fout << "# moment; Kx, Ky Kz, |K|; jspin Jij" << std::endl;
+   fout << "# moment; Ktype, K1, K2, K1x, K1y K1z, K2x, K2y, K2z; jspin Jij" << std::endl;
    fout << nspin << " " << nngbr << std::endl;
    for(int ispin=0; ispin<nspin; ispin++)
    {
       fout << moment[ispin] << std::endl;
-      fout << KiJij[ispin*(nngbr+4)+0] << " " << KiJij[ispin*(nngbr+4)+1] << " " << KiJij[ispin*(nngbr+4)+2] << " " << KiJij[ispin*(nngbr+4)+3] << std::endl;
+      fout << KiJij[ispin*(nngbr+KRECSIZE)+0];
+      for(int i=1; i<KRECSIZE; i++) fout << " " << KiJij[ispin*(nngbr+KRECSIZE)+i];
+      fout << std::endl;
       for(int ingbr=0; ingbr<nngbr; ingbr++)
-         fout << jspin[ispin*nngbr+ingbr] << " " << KiJij[ispin*(nngbr+4)+4+ingbr] << std::endl;
-      
+         fout << jspin[ispin*nngbr+ingbr] << " " << KiJij[ispin*(nngbr+KRECSIZE)+KRECSIZE+ingbr] << std::endl;
    }
 }
 
+
+void EHModel_Hamiltonian::map_energy(std::string filename)
+{
+   const int nz = 128+1;             // number of pts along z axis for each phi, needs to be odd to get z=0
+   double pi = 4.*atan(1.);
+   FILE* fout = fopen(filename.c_str(),"w");
+   fprintf(fout,"# Energy for uniformly magnetized particle\n");
+   fprintf(fout,"# Column 1: phi\n");
+   fprintf(fout,"# Column 2: z = cos(theta)\n");
+   fprintf(fout,"# Column 3: total energy\n");
+   fprintf(fout,"# Column 4: Exchange energy\n");
+   fprintf(fout,"# Column 5: Anisotropy energy\n");
+   fprintf(fout,"# Column 6: Dipole-dipole energy\n");
+   fprintf(fout,"# Column 7: Zeman energy\n");
+   fprintf(fout,"# Column 8: global Mx\n");
+   fprintf(fout,"# Column 9: global My\n");
+   fprintf(fout,"# Column 10: global Mz\n");
+   Config sigma; this->initial(sigma);
+   Observables macro;
+   for(int iphi=0; iphi<5; iphi++)
+   {
+      double phi = iphi*pi/4.;
+      double cosp = std::cos(phi);
+      double sinp = std::sin(phi);
+      for(int iz=0; iz<nz; iz++)
+      {
+         double z = 1.-2.*static_cast<double>(iz)/static_cast<double>(nz-1);
+         double r = std::sqrt(1.-z*z);
+         double x = r*cosp;
+         double y = r*sinp;
+         for(int ispin=0; ispin<nspin; ispin++)
+         {
+            sigma[3*ispin+0] = x;
+            sigma[3*ispin+1] = y;
+            sigma[3*ispin+2] = z;
+         }
+         this->calc_observable(sigma,macro);
+         fprintf(fout,"%lf %lf %lf %lf %lf %lf %lf %lf %lf %lf\n",phi,z,macro.E,macro.E_N,macro.E_K,macro.E_D,macro.E_H,macro.M3d[0],macro.M3d[1],macro.M3d[2]);
+      }
+   }
+   fclose(fout);
+}
 
 #endif
