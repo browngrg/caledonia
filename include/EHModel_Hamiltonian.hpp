@@ -257,7 +257,7 @@ void EHModel_Hamiltonian::calc_observable(Config& sigma, Heisenberg_Observables&
       E_K += calc_Ki(sigma,ispin);
       // calculate exchange energy
       int iptr = (nngbr+KRECSIZE)*ispin + KRECSIZE;
-      for(int j=0; j<nngbr; j++) 
+      for(int j=0; j<nngbr && jspin[nngbr*ispin+j]>=0; j++) 
       {
             E_N += KiJij[iptr++]
                 * ( S[3*(ispin)+0]*S[3*jspin[nngbr*ispin+j]+0] 
@@ -286,7 +286,7 @@ void EHModel_Hamiltonian::change(EHModel_Hamiltonian::Config& sigma, Heisenberg_
    double E_K0 = calc_Ki(sigma,ispin);
    double E_N0 = 0;
    int iptr = (nngbr+KRECSIZE)*ispin + KRECSIZE;
-   for(int j=0; j<nngbr; j++) 
+   for(int j=0; j<nngbr && jspin[nngbr*ispin+j]>=0; j++) 
    {
          E_N0 += KiJij[iptr++]
              * ( S[3*(ispin)+0]*S[3*jspin[nngbr*ispin+j]+0] 
@@ -304,7 +304,7 @@ void EHModel_Hamiltonian::change(EHModel_Hamiltonian::Config& sigma, Heisenberg_
    double E_K1 = calc_Ki(sigma,ispin);
    double E_N1 = 0;
    iptr = (nngbr+KRECSIZE)*ispin + KRECSIZE;
-   for(int j=0; j<nngbr; j++) 
+   for(int j=0; j<nngbr && jspin[nngbr*ispin+j]>=0; j++) 
    {
          E_N1 += KiJij[iptr++]
              * ( S[3*(ispin)+0]*S[3*jspin[nngbr*ispin+j]+0] 
