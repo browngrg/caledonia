@@ -117,6 +117,9 @@ public:
    template<typename WLWalker>
    double DoAnalyzeMPI(std::vector<WLWalker>& walkerpool, WLWalker& global_walker);
 
+   template<typename WLWalker>
+   double rms_change(const WLWalker& global_walker);
+
    template<typename Walker>
    void WriteWLDOS(const Walker& walker, int iupdate);
 
@@ -146,8 +149,8 @@ public:
                                        // RG Ghulghazaryan, S. Hayryan, CK Hu, J Comp Chem 28,  715-726 (2007)
    bool convh;                         // Converge via ln(g_i+1) = ln(g_i) + ln(h_i) when wlgamma = 0;
    bool one_pow_t;                     // Power-law exponent for V/t^pow convergence of gamma
+   bool one_pow_t_regime;              // If in the one_pow_t regime
    int  autoS;                         // Autocorrelation suppression S from C. Zhou and R.N. Bhatt PRE 72, 025701(R) (2005)
-   bool zhou_autoS;                    // Chengang Zhou autocorrelation S? true means update iautoS regardless of WL accept
 
    bool output_configs;
    bool make_movie;                    // Number files by iloop instead of iupdate
@@ -160,6 +163,7 @@ public:
    double wall_limit;                  // Longest time to run (in seconds)
    bool   at_wall_limit;
 
+   std::vector<bool> hever;            // keep track of every bin ever visited
 
    // Windowing information
    int NWindow;                           // Total number of windows
@@ -211,8 +215,8 @@ MC_WangLandau::MC_WangLandau()
    Qquit    = 1.e-4;
    wlgamma_start = 1.;
    one_pow_t  = 0;
+   one_pow_t  = false;
    autoS      = 0;
-   zhou_autoS = false;
    wleta      = 0;
    convh      = false;
    re_iter    = 0;
@@ -242,7 +246,6 @@ void MC_WangLandau::add_options(OPTIONS& options)
    this->wlgamma_start = 1;
    this->one_pow_t = 0;
    this->autoS = 0;
-   this->zhou_autoS = false;
    this->Qquit = 0.10;
    this->make_movie = false;
    lng_est_fn[0]=0;
@@ -259,7 +262,6 @@ void MC_WangLandau::add_options(OPTIONS& options)
    options.add_option( "wlgamma",  "starting value of WL parameter",' ', &(this->wlgamma_start));
    options.add_option( "onepowt",  "exponent for power law gamma",  ' ', &(this->one_pow_t));
    options.add_option( "autoS",    "autocorrelation Suppression",   ' ', &(this->autoS));
-   options.add_option( "ZhouautoS","update autoS count every step", ' ', &(this->zhou_autoS));
    options.add_option( "Q",        "target convergence factor",     ' ', &(this->Qquit));
    options.add_option( "dos",      "dos file to use in sampling",   ' ', lng_est_fn);
    options.add_option( "movie",    "use iloop to number output",    ' ', &(this->make_movie));
@@ -463,6 +465,8 @@ void MC_WangLandau::DoWangLandau(Model& model, Walker& walker, long long nstep, 
       for(int ibin=0; ibin<walker.Sfixed.size(); ibin++)
          walker.Sfixed[ibin] = 0;
    }
+   walker.Slast.resize( walker.S.size() );
+   for(int ibin=0; ibin<walker.S.size(); ibin++) walker.Slast[ibin] = walker.S[ibin];
    int iautoS = 0;
    double wlgamma = walker.wlgamma;
    int ibin = walker.bin();                                            // _C and _PD depend on bin
@@ -500,11 +504,13 @@ void MC_WangLandau::DoWangLandau(Model& model, Walker& walker, long long nstep, 
          }
       }
       walker.wl_now.Sval = walker.get_lndos(walker.now.E,LinearInterp);
+      // Update the Infinite-temperature transition matrix
+      iautoS++;
+      if( iautoS>=autoS ) ittm.add_sample(walker); 
       // A tolerant way to find acceptance vs rejection
       double deltaS = walker.wl_now.Sval - walker.wl_old.Sval;
       bool accept = inwall && ( (deltaS<=0) || (urng()<exp(-deltaS)) ); 
       if( !accept ) walker.restore_initial();
-      if( accept || zhou_autoS ) iautoS++;
       if( iautoS>=autoS )
       {
          iautoS = 0;
@@ -512,15 +518,13 @@ void MC_WangLandau::DoWangLandau(Model& model, Walker& walker, long long nstep, 
          // The Wang-Landau histogram and update
          if( inwall )
          {
-            if( one_pow_t>=1 ) wlgamma = wlgamma_start/std::pow(static_cast<double>(walker.imcs)/walker.now.V,1./one_pow_t);
+            if( one_pow_t_regime ) wlgamma = 1./std::pow(static_cast<double>(walker.imcs)/walker.now.V,1./one_pow_t);
             ibin = walker.bin();             // sets walker.wl_now.ibin also
             walker.h[ibin]++;
             walker.wl_now.Sval += wlgamma;   // Need to update both
             walker.S[ibin] += wlgamma;
             measure.add_sample(walker,wlgamma==0);   
          }
-         // Update the Infinite-temperature transition matrix
-         ittm.add_sample(walker); 
       }
    }
    walker.wlgamma = wlgamma;
@@ -674,10 +678,12 @@ void MC_WangLandau::WriteWLDOS(const Walker& walker, int iupdate)
    out << "# Column " << icol++ << ": Sfixed" << std::endl;
    out << "# Column " << icol++ << ": Swanglandau" << std::endl;
    out.precision(16);
+   if( hever.size()!=walker.h.size() ) { hever.resize(walker.h.size()); std::fill(hever.begin(),hever.end(),false); }
    for(int ibin=0; ibin<walker.window.NBin; ibin++)
    {
-      if( walker.h[ibin]>0 || sittm[ibin]!=0 )
+      if( walker.h[ibin]>0 || sittm[ibin]!=0 || hever[ibin] )
       {
+         hever[ibin] = true;
          double Swl = walker.S[ibin] - S4max;
          double Sfx = walker.Sfixed[ibin] - S3max;
          double Stm = sittm[ibin] - S2max;
@@ -954,6 +960,7 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
    WLWalker global_walker;
    ptime.start();
    at_wall_limit = false;
+   one_pow_t_regime = false;
    while( iupdate<MaxUpdate && !at_wall_limit )
    {
       if(verbose && iupdate>5) 
@@ -968,6 +975,7 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
       // Analysis
       measure.write();
       double WLQ = DoAnalyzeMPI(walkerpool,global_walker);
+      double rms = rms_change(global_walker);
       wlqsave[iwlq%wlqsave.size()] = WLQ;
       double wlqsdev = (iwlq>wlqsave.size())? stddev(wlqsave) : 2*Qquit;
       iwlq++;
@@ -1005,10 +1013,10 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
       if( mp_window.pool.iproc==0 )
       {
          double psecs = static_cast<double>(clock())/static_cast<double>(CLOCKS_PER_SEC);
-         std::cout << "loop= " << iloop << " level=" << iupdate << " WLgamma=" << walkerpool[0].wlgamma << " WLQ=" << WLQ << " sdev(WLQ)=" << wlqsdev << " istep=" << istep << " visit=" << fvisit << " time = " << psecs << " secs" << std::endl;
+         std::cout << "loop= " << iloop << " level=" << iupdate << " WLgamma=" << walkerpool[0].wlgamma << " autoS=" << autoS << " rms=" << rms << " WLQ=" << WLQ << " sdev(WLQ)=" << wlqsdev << " ratio=" <<  wlqsdev/WLQ << " istep=" << istep << " visit=" << fvisit << " time = " << psecs << " secs" << std::endl;
       }
       // Work on convergence
-      if( global_walker.wlgamma>0 && ( WLQ<Qquit || wlqsdev<Qquit )  && allvisit   )
+      if( !one_pow_t_regime && global_walker.wlgamma>0 && ( WLQ<Qquit || wlqsdev<Qquit )  && allvisit   )
       {
          for(int iwalk=0; iwalk<NWalker; iwalk++)
          {
@@ -1016,7 +1024,13 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
             int istart = global_walker.window.bin(Ewin[1*iwin+0]);
             for(int ibin=0; ibin<walkerpool[iwalk].S.size(); ibin++)
                walkerpool[iwalk].S[ibin]  = (1.-wleta)*global_walker.S[istart+ibin]+wleta*(global_walker.Sittm[istart+ibin]-walkerpool[iwalk].Sfixed[ibin]);
-            if( one_pow_t<1 ) walkerpool[iwalk].wlgamma /= 2;
+            if( !one_pow_t_regime )
+            {
+              if( walkerpool[iwalk].wlgamma<1./std::pow(static_cast<double>(walkerpool[iwalk].imcs)/walkerpool[iwalk].now.V,1./one_pow_t) )
+                 one_pow_t_regime = true;
+              else
+                 walkerpool[iwalk].wlgamma /= 2;
+            }
          }
          fvisit = 0;
          WLQold = 0;
@@ -1110,6 +1124,7 @@ double MC_WangLandau::DoAnalyze(std::vector<WLWalker>& walkerpool, WLWalker& ave
    average.clear_histogram();
    average.clear_entropy();
    average.Sfixed = walkerpool[beginwin[iwin]].Sfixed;
+   average.Slast  = walkerpool[beginwin[iwin]].Slast;
    for(int iwalk=beginwin[iwin]; iwalk<beginwin[iwin+1]; iwalk++)
    {
       for(int j=0; j<average.S.size(); j++) average.S[j] += walkerpool[iwalk].S[j];
@@ -1189,6 +1204,7 @@ double MC_WangLandau::DoAnalyzeMPI(std::vector<WLWalker>& walkerpool, WLWalker& 
       if(mp_window.pool.in()) MPI_Allreduce(&WLQ,&WLQ_max,1,MPI_DOUBLE,MPI_MAX,mp_window.pool.comm);
    }
 #  endif
+   global_walker.Slast = walkerpool[0].Slast;
    global_walker.sigma = walkerpool[0].sigma;  // Set NSite
    global_walker.now.V = walkerpool[0].now.V;
    CombinedDOS(averagepool,global_walker);
@@ -1199,6 +1215,30 @@ double MC_WangLandau::DoAnalyzeMPI(std::vector<WLWalker>& walkerpool, WLWalker& 
    global_walker.EStepSum = global_ittm.EStepSum;
    global_walker.EStepCnt = global_ittm.EStepCnt;
    return WLQ_max;
+}
+
+
+// Return the RMS change in the estimated entropy
+template<typename WLWalker>
+double MC_WangLandau::rms_change(const WLWalker& global_walker)
+{
+   double Smax = *(std::max_element(global_walker.S.begin(),global_walker.S.end()));
+   double Smax2 = *(std::max_element(global_walker.Slast.begin(),global_walker.Slast.end()));
+   double Smaxdiff = Smax - Smax2;
+   std::ofstream fout("MC_WangLandau.csv");
+   double rmsdelta = 0;
+   double rmscount = 0;
+   for(int k=0; k<global_walker.S.size(); k++)
+   {
+      if( global_walker.h[k]>0 )
+      {
+         double diff = global_walker.S[k] - global_walker.Slast[k] - Smaxdiff;
+         diff = diff*diff;
+         rmsdelta += diff;
+         rmscount += 1;
+      }
+   }
+   return std::sqrt(rmsdelta/rmscount);
 }
 
 
