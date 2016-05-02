@@ -34,6 +34,7 @@ public:
    WL_State             wl_now,wl_old;      // Wang-Landau information
    WL_Window            window;             // Wang-Landau Window provides limits and binning
    std::vector<double>  S;                  // Entropy = log-density-of-states
+   std::vector<double>  Slast;              // Last set of values, used to check convergence
    std::vector<double>  Sfixed;             // Changes only very slowly
    std::vector<double>  h;                  // Visit histogram
 
