@@ -75,7 +75,7 @@ EMX_Measure::EMX_Measure()
 { 
    written=true; 
    icall = 0;
-   make_map = true;
+   make_map = false;
    // Any automatic set-up actions go here
    filename = "";
 }
