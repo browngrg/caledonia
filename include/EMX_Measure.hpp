@@ -126,7 +126,7 @@ void EMX_Measure::add_sample(const MCWalker& walker, bool at_equilibrium)
    // Equilibrium Measurements Come Here:
    if( !at_equilibrium) return;
    int jbin = binM(static_cast<float>(walker.now.M)/static_cast<float>(walker.now.V)); 
-   em_map[ibin*NBinM+jbin]++;
+   if(em_map.size()>0) em_map[ibin*NBinM+jbin]++;
 }
 
 void EMX_Measure::clear()
