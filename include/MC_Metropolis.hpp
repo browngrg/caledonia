@@ -43,6 +43,8 @@ public:
    double ckpt_last;              // When the last ckpt write occurred
    double wall_limit;             // Longest time to run (in seconds)
    bool   at_wall_limit;
+   long   imcs_total;
+   bool   write_mcssec;
 
 public:
 
@@ -62,6 +64,8 @@ public:
       wall_limit = 24*60*60;
       ckpt_freq  = 10*60;
       ckpt_last  = 0;
+      imcs_total = 0;
+      write_mcssec = false;
    }
 
    ~MC_Metropolis()
@@ -139,6 +143,7 @@ void MC_Metropolis::DoNStep(long NStep, Hamiltonian& hamilton, MCWalker& walker)
       // Restore initial state if proposal rejected
       if( !accept ) walker.restore_initial(); 
       walker.imcs++;
+      imcs_total++;
    }
    walker.MCSS = static_cast<double>(walker.imcs)/static_cast<double>(walker.now.V);
 }
@@ -229,6 +234,12 @@ void MC_Metropolis::DoSample(Hamiltonian& hamilton, std::vector<MCWalker>& walke
       measure_obj.write();
       this->write(walker);
       this->CalcOptimal_kT(walker,false);
+   }
+   if(write_mcssec)
+   {
+      double ptime_sec = ptime.elapsed();
+      double mcs_sec = static_cast<double>(imcs_total)/ptime.elapsed();
+      std::cout << __FILE__ << ":" << __LINE__ << " mcs/sec=" << mcs_sec << std::endl;
    }
 }
 
