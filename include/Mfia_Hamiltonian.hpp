@@ -198,6 +198,7 @@ void Mfia_Hamiltonian::add_options(OPTIONS& options)
 std::string Mfia_Hamiltonian::header() const
 {
    char buffer[1024];
+   sprintf(buffer,"# Mfia Hamiltonian JSIGN=%d A=%lf H=%lf L=%d\n",JSIGN,A,H,L);
    return std::string(buffer);
 }
 
