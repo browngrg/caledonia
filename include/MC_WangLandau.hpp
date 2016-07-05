@@ -276,7 +276,13 @@ MC_WangLandau::~MC_WangLandau()
 template<typename HAMILTON, typename WALKER> 
 void MC_WangLandau::init(HAMILTON& hamilton, std::vector<WALKER>& walkerpool, bool _verbose)
 {
-   this->mp_window.pool = MPI_Struct::world();
+   //this->mp_window.pool = MPI_Struct::world();
+   this->mp_window.set_pool( MPI_Struct::world() );
+   if( !mp_window.pool.in() )
+   {
+      std::cout << __FILE__ << ":" << __LINE__ << " Error creating MPI_Struct::world()" << std::endl;
+      std::cout << "iproc=" << mp_window.pool.iproc << " nproc=" << mp_window.pool.nproc << std::endl;
+   }
    verbose = _verbose && (this->mp_window.pool.iproc==0);
    if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " entering init" << std::endl;
    hamilton.calc_observable(walkerpool[0].sigma,walkerpool[0].now);
@@ -1356,7 +1362,17 @@ void MC_WangLandau::positive_temps(std::vector<double>& energy, std::vector<doub
 // Equal width windows
 void MC_WangLandau::partition_windows()
 {
-   if( !mp_window.pool.in() ) return;
+   if(verbose) std::cout << __FILE__ << ":" << __LINE__ <<  "(" << mp_window.pool.iproc << ")" << std::endl;
+   if( !mp_window.pool.in() ) 
+   {
+      if(verbose)
+      {
+         std::cout << __FILE__ << ":" << __LINE__ << "(" << mp_window.pool.iproc << ") mp_window.pool.in() failed. pool comm=" << mp_window.pool.comm << std::endl;
+         std::cout << __FILE__ << ":" << __LINE__ << "Has init(hamiltonian,walkerpool) been called?" << std::endl;
+
+      }
+      return;
+   }
    int iproc= mp_window.pool.iproc;
    if( verbose ) 
       std::cout << __FILE__ << ":" << __LINE__ <<  "(" << iproc << ") Global Window = [" << Elo << "," << Ehi << "] Ebin=" << Ebin << std::endl;
@@ -1366,6 +1382,7 @@ void MC_WangLandau::partition_windows()
    Ehi = std::max(Ehi,Elo+Ebin*nbin);
    deltawin = nbin*Ebin;
    if( nbin<10 ) std::cout << __FILE__ << ":" << __LINE__ << " Too few bins per window. nbin=" << nbin << std::endl;
+   if( NWindow<=0 ) std::cout << __FILE__ << ":" << __LINE__ << " NWindow=" << NWindow << std::endl;
    Ewin.resize(2*NWindow);
    for(int iwin=0; iwin<NWindow; iwin++)
    {
@@ -1447,7 +1464,6 @@ void MC_WangLandau::partition_windows(std::vector<double>& energy, std::vector<d
 template<typename Walker>
 void MC_WangLandau::init_pool(std::vector<Walker>& walkerpool)
 {
-   bool verbose = false;
    // Set up the windows (here NWindow is global number of windows)
    if( this->NWalkPerProcess<1 ) this->NWalkPerProcess=1;
    int NWalker = 1;
@@ -1496,18 +1512,21 @@ void MC_WangLandau::init_pool(std::vector<Walker>& walkerpool)
       }
       if(verbose && mp_window.pool.iproc==0) std::cout << __FILE__ << ":" << __LINE__ << " Global Window = [" << Elo << "," << Ehi << "]" << std::endl;
       partition_windows();
+      if( Ewin.size()==0 ) std::cout << __FILE__ << ":" << __LINE__ << " Ewin[] not set" << std::endl;
    }
-   if(false) std::cout << __FILE__ << ":" << __LINE__ << "(" << mp_window.pool.iproc << ")" << std::endl;
    ittm.mp = mp_window.pool;
    ittm.init(Elo,Ehi,Ebin);
    if(restart_ITTM) ittm.read();
-   if(false) std::cout << __FILE__ << ":" << __LINE__ << "(" << mp_window.pool.iproc << ")" << std::endl;
+   if(verbose && mp_window.pool.iproc==0) std::cout << __FILE__ << ":" << __LINE__ << "(" << mp_window.pool.iproc << ")" << std::endl;
    if( mp_window.pool.nproc==1 )
    {
       // Serial
       const int NWindow_Local = beginwin.size()-1;
+      if(verbose && mp_window.pool.iproc==0) std::cout << __FILE__ << ":" << __LINE__ << " NWindow_Local=" << NWindow_Local << std::endl;
       for(int iwin=0; iwin<NWindow_Local; iwin++)
       {
+         if( Ewin.size()<=(2*iwin+1) )
+            std::cout << __FILE__ << ":" << __LINE__ << " iwin=" << iwin << " Ewin.size()=" << Ewin.size() << " too small. NWindow=" << NWindow << std::endl;
          for(int iwalk=beginwin[iwin]; iwalk<beginwin[iwin+1]; iwalk++) 
          {
             walkerpool[iwalk].window.set_delta(Ewin[2*iwin],Ewin[2*iwin+1],iwin,Ebin);
