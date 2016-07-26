@@ -100,9 +100,6 @@ public:
    template<typename Model, typename Walker>
    void DoIntoWindow(Model& model, Walker& wlwalk);
 
-   template<typename Model, typename Walker>
-   void DoConstrictorSample(Model& model, std::vector<Walker>& wlwalk);
-
    double WLAnalyze(const std::vector<double>& h, int ibegin, int iend);
 
    template<typename Walker>
@@ -131,6 +128,9 @@ public:
 
    template<typename Walker>
    void CombinedDOS(const std::vector<Walker>& walkerpool, Walker& combined);
+
+   template<typename Walker>
+   void ReadSfixed(std::string fname, std::vector<Walker>& walkerpool);
 
    ~MC_WangLandau();
 
@@ -172,6 +172,8 @@ public:
    float   fwinover;                      // fractional overlap of windows
    float   Ebin;                          // A better parameter for binning than nbin
    std::vector<double> Ewin;              // (Elo,Ehi)[0], (Elo,Ehi][1], ... for the windows
+   double  Mlo,Mhi;
+   float   Mbin;
 
    std::vector<int> beginwin;             // Grouping of walkers in serial run
    MPI_Gang         mp_window;            // Details of parallel implementation
@@ -196,6 +198,17 @@ public:
 private:
 
    enum  { verbose_debug = false };          // very verbose tracing
+
+private:
+
+   double add_logs(double log1, double log2)
+   {
+      using namespace std;
+      if(log1<log2) swap(log1,log2);
+      double negarg = log2-log1;
+      double factor = 1 + exp(negarg);
+      return log1 + log(factor);
+   }
 
 };
 
@@ -227,6 +240,9 @@ MC_WangLandau::MC_WangLandau()
    fwinover   = 0.5;                                         // fractional overlap, maximal for M/(M+1)
    kTlo       = 0.5;
    kThi       = 5.0;
+   Mlo        = 0;
+   Mhi        = 1;
+   Mbin       = -1;
    at_wall_limit = false;
    wall_limit = 24*60*60;
    lng_est_fn[0]=0;
@@ -249,23 +265,26 @@ void MC_WangLandau::add_options(OPTIONS& options)
    this->Qquit = 0.10;
    this->make_movie = false;
    lng_est_fn[0]=0;
-   options.add_option( "Elo",     "lower side of energy window",    ' ', &(this->Elo));
-   options.add_option( "Ehi",     "lower side of energy window",    ' ', &(this->Ehi));
-   options.add_option( "Ebin",    "width of energy bins",           ' ', &(this->Ebin));
-   options.add_option( "numwin",  "number of windows",              ' ', &(this->NWindow));
-   options.add_option( "numwalk", "number of walkers per window",   ' ', &(this->NWalkPerProcess));
-   options.add_option( "overlap", "fractional overlap of windows",  ' ', &(this->fwinover));
-   options.add_option( "nstep",   "number of steps per iteration",  ' ', &(this->NStep));
-   options.add_option( "maxupdate","maximum number of iterations",  ' ', &(this->MaxUpdate));
-   options.add_option( "dosinterp","linear interpolation of dos",   ' ', &(this->LinearInterp));
-   options.add_option( "wleta",    "weighting between WL and ITTM", ' ', &(this->wleta));
-   options.add_option( "wlgamma",  "starting value of WL parameter",' ', &(this->wlgamma_start));
-   options.add_option( "onepowt",  "exponent for power law gamma",  ' ', &(this->one_pow_t));
-   options.add_option( "autoS",    "autocorrelation Suppression",   ' ', &(this->autoS));
-   options.add_option( "Q",        "target convergence factor",     ' ', &(this->Qquit));
-   options.add_option( "dos",      "dos file to use in sampling",   ' ', lng_est_fn);
-   options.add_option( "movie",    "use iloop to number output",    ' ', &(this->make_movie));
-   options.add_option( "walllimit","maximum run time",              ' ', &(this->wall_limit));
+   options.add_option( "Elo",     "lower side of energy window",          ' ', &(this->Elo));
+   options.add_option( "Ehi",     "higher side of energy window",         ' ', &(this->Ehi));
+   options.add_option( "Ebin",    "width of energy bins",                 ' ', &(this->Ebin));
+   options.add_option( "Mlo",     "lower side of magnetization window",   ' ', &(this->Mlo));
+   options.add_option( "Mhi",     "higher side of magnetization window",  ' ', &(this->Mhi));
+   options.add_option( "Mbin",    "width of magnetization bins",          ' ', &(this->Mbin));
+   options.add_option( "numwin",  "number of windows",                    ' ', &(this->NWindow));
+   options.add_option( "numwalk", "number of walkers per window",         ' ', &(this->NWalkPerProcess));
+   options.add_option( "overlap", "fractional overlap of windows",        ' ', &(this->fwinover));
+   options.add_option( "nstep",   "number of steps per iteration",        ' ', &(this->NStep));
+   options.add_option( "maxupdate","maximum number of iterations",        ' ', &(this->MaxUpdate));
+   options.add_option( "dosinterp","linear interpolation of dos",         ' ', &(this->LinearInterp));
+   options.add_option( "wleta",    "weighting between WL and ITTM",       ' ', &(this->wleta));
+   options.add_option( "wlgamma",  "starting value of WL parameter",      ' ', &(this->wlgamma_start));
+   options.add_option( "onepowt",  "exponent for power law gamma",        ' ', &(this->one_pow_t));
+   options.add_option( "autoS",    "autocorrelation Suppression",         ' ', &(this->autoS));
+   options.add_option( "Q",        "target convergence factor",           ' ', &(this->Qquit));
+   options.add_option( "dos",      "dos file to use in sampling",         ' ', lng_est_fn);
+   options.add_option( "movie",    "use iloop to number output",          ' ', &(this->make_movie));
+   options.add_option( "walllimit","maximum run time",                    ' ', &(this->wall_limit));
 }
 
 MC_WangLandau::~MC_WangLandau()
@@ -476,7 +495,7 @@ void MC_WangLandau::DoWangLandau(Model& model, Walker& walker, long long nstep, 
    int iautoS = 0;
    double wlgamma = walker.wlgamma;
    int ibin = walker.bin();                                            // _C and _PD depend on bin
-   walker.wl_now.Sval = walker.get_lndos(walker.now.E,LinearInterp);  
+   walker.wl_now.Sval = walker.get_lndos(walker.now.E,walker.now.M,LinearInterp);  
    for(long long istep=0; istep<nstep; istep++)
    {
       // Propose a step in the Markov chain
@@ -491,13 +510,14 @@ void MC_WangLandau::DoWangLandau(Model& model, Walker& walker, long long nstep, 
          start_inwall = inwall;
          walker.save_initial();
          model.mc_step(walker,urng);
-         walker.wl_now.Sval = walker.get_lndos(walker.now.E,LinearInterp); 
+         walker.wl_now.Sval = walker.get_lndos(walker.now.E,walker.now.M,LinearInterp); 
          inwall = ( walker.now.E>=walker.WEmin && walker.now.E<=walker.WEmax );
          // Drift towards wall
          if( !start_inwall &&
              ( ( walker.old.E< walker.WEmin && walker.old.E> walker.now.E )
             || ( walker.old.E> walker.WEmax && walker.old.E< walker.now.E ) ) )
          {
+            if(verbose && verbose_debug) std::cout << __FILE__ << ":" << __LINE__ << " outside wall istep=" << istep << std::endl;
             walker.restore_initial();
          }
          // Want old to be inside windows (have to allow for steps outside, though)
@@ -509,7 +529,7 @@ void MC_WangLandau::DoWangLandau(Model& model, Walker& walker, long long nstep, 
                       << walker.now.E << " [" << walker.WEmin << "," << walker.WEmax << "]" << std::endl;
          }
       }
-      walker.wl_now.Sval = walker.get_lndos(walker.now.E,LinearInterp);
+      walker.wl_now.Sval = walker.get_lndos(walker.now.E,walker.now.M,LinearInterp);
       // Update the Infinite-temperature transition matrix
       iautoS++;
       if( iautoS>=autoS ) ittm.add_sample(walker); 
@@ -530,6 +550,9 @@ void MC_WangLandau::DoWangLandau(Model& model, Walker& walker, long long nstep, 
             walker.wl_now.Sval += wlgamma;   // Need to update both
             walker.S[ibin] += wlgamma;
             measure.add_sample(walker,wlgamma==0);   
+            if(verbose && verbose_debug) 
+               std::cout <<  __FILE__ << ":" << __LINE__ << " iautoS=" << iautoS << " imcs=" << walker.imcs << " ibin=" << ibin << " h=" << walker.h[ibin] 
+                         << " S=" << walker.S[ibin] << " accept=" << accept << " deltaS=" << deltaS << std::endl;
          }
       }
    }
@@ -674,6 +697,7 @@ void MC_WangLandau::WriteWLDOS(const Walker& walker, int iupdate)
    out << "# iupdate = " << iupdate << std::endl;
    out << "# Average Energy step = " << EStepMean << " = " << EStepFrac << " of Ebin" << std::endl;
    out << "# Column " << icol++ << ": E central energy of bin" << std::endl;
+   out << "# Column " << icol++ << ": M central magnetization of bin" << std::endl;
    out << "# Column " << icol++ << ": S = Entropy = lng" << std::endl;
    out << "# Column " << icol++ << ": s = S/V = entropy per spin" << std::endl;
    out << "# Column " << icol++ << ": h = visit histogram raw" << std::endl;
@@ -695,7 +719,8 @@ void MC_WangLandau::WriteWLDOS(const Walker& walker, int iupdate)
          double Stm = sittm[ibin] - S2max;
          double S = Sadd[ibin] - Smax;
          double h = hnorm*walker.h[ibin];
-         out << walker.window.unbin(ibin) << " " << S << " " << S/V 
+         out << walker.window.unbinE(ibin) << " " << walker.window.unbinM(ibin) 
+             << " " << S << " " << S/V 
              << " " << walker.h[ibin] << " " << h << " " << ibin 
              << " " << Stm << " " << vttt[ibin] 
              << " " << Sfx << " " << Swl << std::endl;
@@ -729,8 +754,8 @@ void MC_WangLandau::WriteWLBoltzmann(const Walker& walker, int iupdate)
    const double dkT = (kThi-kTlo)/static_cast<double>(nKTpt-1);
    const int npt = walker.S.size();
    if(npt<3) return;
-   std::vector<double> E(npt);
-   for(int i=0; i<npt; i++) E[i] = walker.window.unbin(i);
+   std::vector<double> E,M; 
+   walker.window.vector_EM(E,M);
    std::vector<double> lng(npt);
    for(int i=0; i<npt; i++) lng[i] = walker.S[i] + walker.Sfixed[i];
    std::vector<double> A(npt);
@@ -787,111 +812,6 @@ void MC_WangLandau::WriteWalkers(const std::vector<Walker>& walkerpool, int iupd
       fout << std::endl;
    }
 }
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-// Use moving walls to force walkers throughout window
-// Currently walkers can get trapped outside wall and not find their way in
-template<typename Model, typename Walker>
-void MC_WangLandau::DoConstrictorSample(Model& model, std::vector<Walker>& walkerpool)
-{
-   const int NWalker = walkerpool.size();
-   const int NWindow_Local = beginwin.size()-1;
-   // Clear histogram
-   for(int iwalk=0; iwalk<NWalker; iwalk++) 
-   {
-      Walker& walker(walkerpool[iwalk]);
-      if( walker.h.size()!=walker.S.size() ) { walker.h.resize(walker.S.size()); }
-      std::fill(walker.h.begin(),walker.h.end(),0); 
-      std::fill(walker.S.begin(),walker.S.end(),0);            // Enforce S==0 outside stage window
-      walker.wlgamma = 1;
-   }
-   long NStepDo = NStep*walkerpool[0].now.V;
-   // Do the actual convergence
-   if(verbose) std::cout << __FILE__ << ":" << __LINE__ << std::endl;
-   std::vector<bool> converged(NWindow_Local,false);
-   bool all_converged = true;
-   for(int i=0; all_converged && i<converged.size(); i++) all_converged = all_converged && converged[i];
-   long long totalstep = 0;
-   while( !all_converged )
-   {
-      for(int iwin=0; iwin<NWindow_Local; iwin++) 
-      {
-         if( !converged[iwin] )
-         {
-            for(int iwalk=beginwin[iwin]; iwalk<beginwin[iwin+1]; iwalk++) 
-            {
-               DoWangLandau(model,walkerpool[iwalk],NStepDo);                  // Do the steps using Wang-Landau algorithm
-               totalstep += NStepDo;
-            }
-         }
-         // adjust walls
-         Walker average;
-         average.copy(walkerpool[beginwin[iwin]]);
-         average.clear_histogram();
-         for(int iwalk=beginwin[iwin]; iwalk<beginwin[iwin+1]; iwalk++)
-            for(int j=0; j<average.h.size(); j++) average.h[j] += walkerpool[iwalk].h[j];
-         average.window = walkerpool[beginwin[iwin]].window;
-         average.WEmin = walkerpool[beginwin[iwin]].WEmin;
-         average.WEmax = walkerpool[beginwin[iwin]].WEmax;
-#        ifdef USE_MPI
-         if( mp_window.ngang>1 )
-         {
-            std::vector<double> mpi_buffer_d(average.h.size(),0);
-            if(mp_window.gang.in()) PI_Allreduce(&(average.h[0]),&(mpi_buffer_d[0]),average.h.size(),MPI_DOUBLE,MPI_SUM,mp_window.gang.comm);
-            for(int j=0; j<average.h.size(); j++) average.h[j] = mpi_buffer_d[j];
-         }
-#        endif
-         const int mincts = 50000;
-         int ilft = average.window.bin(average.WEmin);
-         int irgt = average.window.bin(average.WEmax);
-         while( ilft<irgt && average.h[ilft]>mincts ) ilft++;
-         while( irgt>ilft && average.h[irgt]>mincts ) irgt--;
-         if( irgt<=ilft )
-         {
-            converged[iwin] = true;
-         }
-         else
-         {
-            average.WEmin = average.window.unbin(ilft);
-            average.WEmax = average.window.unbin(irgt);
-            for(int iwalk=beginwin[iwin]; iwalk<beginwin[iwin+1]; iwalk++)
-            {
-               // all walkers get the same window
-               walkerpool[iwalk].WEmin = average.WEmin;                              
-               walkerpool[iwalk].WEmax = average.WEmax;
-            }
-         }
-         if( mp_window.gang.iproc==0 ) std::cout << "Constrictor iproc=" << mp_window.pool.iproc << " iwindow=" << iwin << " ilft=" << ilft << " irgt=" << irgt << " converge=" << converged[iwin] << std::endl;
-      }
-      all_converged = true;
-      for(int i=0; all_converged && i<converged.size(); i++) all_converged = all_converged && converged[i];
-#     ifdef USE_MPI
-      bool local_converged = all_converged;
-      if(mp_window.pool.in()) MPI_Allreduce(&local_converged,&all_converged,1,MPI_C_BOOL,MPI_LAND,mp_window.pool.comm);
-#     endif
-   }
-   Walker global_walker;
-   double WLQ = DoAnalyzeMPI(walkerpool,global_walker);
-   global_walker.wlgamma = walkerpool[0].wlgamma;
-   int iupdate = 0;
-   WriteWLDOS(global_walker,iupdate);
-   WriteWLBoltzman(global_walker,iupdate);
-   for(int iwalk=0; iwalk<NWalker; iwalk++) 
-   {
-      std::fill(walkerpool[iwalk].h.begin(),walkerpool[iwalk].h.end(),0);
-      std::fill(walkerpool[iwalk].S.begin(),walkerpool[iwalk].S.end(),0);
-      walkerpool[iwalk].wlgamma = 0;
-      walkerpool[iwalk].WEmin = walkerpool[iwalk].window.Elo;
-      walkerpool[iwalk].WEmax = walkerpool[iwalk].window.Ehi;
-      int iwin = walkerpool[iwalk].window.iwindow;
-      int istart = global_walker.window.bin(Ewin[1*iwin+0]);
-      for(int ibin=0; ibin<walkerpool[iwalk].S.size(); ibin++)
-         walkerpool[iwalk].Sfixed[ibin] = global_walker.Sittm[istart+ibin];
-   }
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 // Converge the DOS/Entropy to self-consistency by decreasing wlgamma
 template<typename Model, typename WLWalker>
@@ -908,14 +828,8 @@ void MC_WangLandau::DoWLConverge(Model& model, std::vector<WLWalker>& walkerpool
 template<typename Model, typename WLWalker>
 void MC_WangLandau::DoTMConverge(Model& model, std::vector<WLWalker>& walkerpool)
 {
-#  if 1
    wleta = 1;
    wlgamma_start = 1;
-#  else
-   DoConstrictorSample(model,walkerpool);
-   wleta = 1;
-   wlgamma_start = 0;
-#  endif
    DoConverge(model,walkerpool);
 }
 
@@ -938,6 +852,21 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
    const int NWalker = walkerpool.size();
    long NStepDo = NStep*walkerpool[0].now.V;
    if(verbose) std::cout << "wlgamma_start = " << wlgamma_start << std::endl;
+   std::ofstream statout;
+   if( mp_window.pool.iproc==0 )
+   {
+      statout.open("MC_WangLandau_timing.csv");
+      statout << "# Column 1: iloop" << std::endl;
+      statout << "# Column 2: iupdate (WL iteration)" << std::endl;
+      statout << "# Column 3: istep (mcs)" << std::endl;
+      statout << "# Column 4: WL gamma" << std::endl;
+      statout << "# Column 5: autoS, the autocorrelation skip" << std::endl;
+      statout << "# Column 6: WLQ = max(WLQ[i]) = sum_i (h[i]-1)^2 / NBin" <<std::endl;
+      statout << "# Column 7: stddev(WLQ[-20:]), standard deviation over last 20 values" << std::endl;
+      statout << "# Column 8: ratio WLQ/stddev(), column 5, column 6" << std::endl;
+      statout << "# Column 9: fraction of bins visited" << std::endl;
+      statout << "# Column 10: process time (seconds)" << std::endl;
+   }
    for(int iwalk=0; iwalk<NWalker; iwalk++)
    {
       walkerpool[iwalk].imcs = 0;
@@ -1019,7 +948,7 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
       if( mp_window.pool.iproc==0 )
       {
          double psecs = static_cast<double>(clock())/static_cast<double>(CLOCKS_PER_SEC);
-         std::cout << "loop= " << iloop << " level=" << iupdate << " WLgamma=" << walkerpool[0].wlgamma << " autoS=" << autoS << " rms=" << rms << " WLQ=" << WLQ << " sdev(WLQ)=" << wlqsdev << " ratio=" <<  wlqsdev/WLQ << " istep=" << istep << " visit=" << fvisit << " time = " << psecs << " secs" << std::endl;
+         statout << iloop << " " << iupdate << " " << istep << " " << walkerpool[0].wlgamma << " " << autoS << " " << WLQ << " " << wlqsdev << " " << wlqsdev/WLQ << " " << fvisit << " " << psecs << std::endl;
       }
       // Work on convergence
       if( !one_pow_t_regime && global_walker.wlgamma>0 && ( WLQ<Qquit || wlqsdev<Qquit )  && allvisit   )
@@ -1027,7 +956,7 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
          for(int iwalk=0; iwalk<NWalker; iwalk++)
          {
             int iwin = walkerpool[iwalk].window.iwindow;
-            int istart = global_walker.window.bin(Ewin[1*iwin+0]);
+            int istart = global_walker.window.bin(Ewin[1*iwin+0],Mlo);
             for(int ibin=0; ibin<walkerpool[iwalk].S.size(); ibin++)
                walkerpool[iwalk].S[ibin]  = (1.-wleta)*global_walker.S[istart+ibin]+wleta*(global_walker.Sittm[istart+ibin]-walkerpool[iwalk].Sfixed[ibin]);
             if( !one_pow_t_regime )
@@ -1059,7 +988,7 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
          for(int iwalk=0; iwalk<NWalker; iwalk++)
          {
             int iwin = walkerpool[iwalk].window.iwindow;
-            int istart = global_walker.window.bin(Ewin[1*iwin+0]);
+            int istart = global_walker.window.bin(Ewin[1*iwin+0],Mlo);
             for(int ibin=0; ibin<walkerpool[iwalk].S.size(); ibin++)
             {
                double lng = global_min;
@@ -1092,7 +1021,7 @@ void MC_WangLandau::DoConverge(Model& model, std::vector<WLWalker>& walkerpool, 
    for(int iwalk=0; iwalk<NWalker; iwalk++)
    {
       int iwin = walkerpool[iwalk].window.iwindow;
-      int istart = global_walker.window.bin(Ewin[1*iwin+0]);
+      int istart = global_walker.window.bin(Ewin[1*iwin+0],Mlo);
       for(int ibin=0; ibin<walkerpool[iwalk].h.size(); ibin++)
          walkerpool[iwalk].h[ibin] = global_walker.h[istart+ibin];
    }
@@ -1213,6 +1142,8 @@ double MC_WangLandau::DoAnalyzeMPI(std::vector<WLWalker>& walkerpool, WLWalker& 
    global_walker.Slast = walkerpool[0].Slast;
    global_walker.sigma = walkerpool[0].sigma;  // Set NSite
    global_walker.now.V = walkerpool[0].now.V;
+   for(int iwin=0; iwin<NWindow; iwin++) 
+      averagepool[iwin].window.set(Ewin[2*iwin],Ewin[2*iwin+1],Ebin,Mlo,Mhi,Mbin,iwin);
    CombinedDOS(averagepool,global_walker);
    ITTM global_ittm;
    ittm.get_global(global_ittm);
@@ -1292,51 +1223,108 @@ public:
 template<typename Walker>
 void MC_WangLandau::CombinedDOS(const std::vector<Walker>& walkerpool, Walker& combined)
 {
+   const bool debug_match = false;
    // Set the global window. iwin<0 indicates global window by convention
-   combined.window.set_delta(Elo,Ehi,-1,Ebin); 
+   combined.window.set(Elo,Ehi,Ebin,Mlo,Mhi,Mbin,-1); 
    int NBinC = combined.window.NBin;
    combined.S.resize(NBinC);
    combined.Sfixed.resize(NBinC);
    combined.h.resize(NBinC);
+   // Construct density of states over E only
+   int NBinE = walkerpool[0].window.NBinE;
+   int NBinM = walkerpool[0].window.NBinM;
    int NWin = walkerpool.size();
-// for(int iwin=0; iwin<NWin; iwin++) 
-// { 
-//    combined.EStepSum += walkerpool[iwin].EStepSum; 
-//    combined.EStepCnt += walkerpool[iwin].EStepCnt; 
-// }
-   // Do a simple obliteration approach (for debugging?)
-   int ifar = 0;
+   std::vector< std::vector<double> > SE(NWin);
+   std::vector< std::vector<double> > HE(NWin);
+   for(int iwin=0; iwin<NWin; iwin++) 
+   {
+      SE[iwin].resize( walkerpool[iwin].window.NBinE );
+      HE[iwin].resize( walkerpool[iwin].window.NBinE );
+      for(int i=0; i<NBinE; i++) 
+      {
+         double sumSEM = walkerpool[iwin].S[i*NBinM+0];
+         for(int j=1; j<NBinM; j++)
+            sumSEM = add_logs(sumSEM,walkerpool[iwin].S[i*NBinM+j]);
+         SE[iwin][i] = sumSEM;
+         HE[iwin][i] = 0;
+         for(int j=1; j<NBinM; j++)
+            HE[iwin][i] += walkerpool[iwin].h[i*NBinM+j];
+      }
+   }
+   std::vector<int> biased(NWin);
    for(int iwin=0; iwin<NWin; iwin++)
    {
-      int NBinW = walkerpool[iwin].window.NBin;
-      int istart = combined.window.bin(Ewin[2*iwin+0]);
+      biased[iwin] = 0;
+      if( HE[iwin][0]>(1000*HE[iwin][NBinE-1]) ) biased[iwin] = -1;
+      if( HE[iwin][NBinE-1]>(1000*HE[iwin][0]) ) biased[iwin] = +1;
+   }   
+   if( debug_match && mp_window.pool.iproc==0 )
+   {
+      std::ofstream sout("MC_WangLandau_CombinedDump.csv");
+      sout << "# Column 1: E" << std::endl;
+      sout << "# Column 2: S(E)" << std::endl;
+      sout << "# Column 3: h(E)" << std::endl;
+      sout << "# Column 4: iwin" << std::endl;
+      sout << "# Column 5: ibin (local)" << std::endl;
+      sout << "# Column 6: ibin (global)" << std::endl;
+      for(int iwin=0; iwin<NWin; iwin++)
+      {
+         int NBinM = walkerpool[iwin].window.NBinM;
+         for(int ibin=0; ibin<SE[iwin].size(); ibin++)
+         {
+            int istart = combined.window.binE(Ewin[2*iwin+0]);     // Where this window starts in global indexing
+            double E = walkerpool[iwin].window.unbinE(ibin);
+            sout << E << " " << SE[iwin][ibin] << " " << HE[iwin][ibin] << " " << iwin << " " << ibin << " " << ibin+istart << std::endl;
+         }
+      }
+   }
+   std::vector<double> combSE(combined.window.NBinE);
+   // Do a simple obliteration approach (for debugging?)
+   // Decomposition is always in E. Had to modify to deal with g(E,M)
+   int ifar = 0;
+   for(int iwin=0; iwin<NWin; iwin++)
+   {  
+      int NBinE = walkerpool[iwin].window.NBinE;
+      int NBinM = walkerpool[iwin].window.NBinM;  // This is the stride in E
+      int istart = combined.window.binE(Ewin[2*iwin+0]);     // Where this window starts in global indexing
+      if( debug_match && mp_window.pool.iproc==0 ) std::cout << __FILE__ << ":" << __LINE__ << " iwin=" << iwin << " istart=" << istart << " ifar=" << ifar << std::endl;
       double offS = 0;
       int imatch = 0;
-      // find match point
+      // find point where slopes match
       if( iwin>0 )
       {
-         int NGuard = static_cast<double>(NBinW)*fwinover/10.;
+         int NGuard = static_cast<double>(NBinE)*fwinover/10.;
          imatch = NGuard;
          int imatch_max = ifar - istart - 1;
-         double slope_lo = combined.S[istart+imatch+1] - combined.S[istart+imatch];
-         double slope_hi = walkerpool[iwin].S[imatch+1] - walkerpool[iwin].S[imatch];
+         double slope_lo = combSE[istart+imatch+1] - combSE[istart+imatch];
+         double slope_hi = SE[iwin][imatch+1] - SE[iwin][imatch];   //double slope_hi = walkerpool[iwin].S[imatch+1] - walkerpool[iwin].S[imatch];
          bool foo = !(slope_hi>slope_lo);
          while( imatch<imatch_max && (foo^(slope_hi>slope_lo)) )
          {
-            slope_lo = combined.S[istart+imatch+1] - combined.S[istart+imatch];
-            slope_hi = walkerpool[iwin].S[imatch+1] - walkerpool[iwin].S[imatch];
+            slope_lo = combSE[istart+imatch+1] - combSE[istart+imatch];
+            slope_hi = SE[iwin][imatch+1] - SE[iwin][imatch];
             imatch++;
          }
-         offS = combined.S[istart+imatch] - walkerpool[iwin].S[imatch];
+         // If biased, keep all data from stached up end
+         if( biased[iwin-1]<0 ) imatch = 0;
+         if( biased[iwin-1]>0 ) imatch = imatch_max;
+         offS = combSE[istart+imatch] - SE[iwin][imatch];
       }
-      for(int ibin=imatch; ibin<NBinW; ibin++)
+      if( debug_match && mp_window.pool.iproc==0 ) std::cout << __FILE__ << ":" << __LINE__ << " iwin=" << iwin << " imatch=" << imatch << " offS=" << offS << std::endl;
+      for(int ibin=imatch; ibin<NBinE; ibin++)
       {
+         // Apply offset to SE
          int ibinc = istart + ibin;
-         combined.S[ibinc]      = walkerpool[iwin].S[ibin] + offS;
-         combined.Sfixed[ibinc] = walkerpool[iwin].Sfixed[ibin];
-         combined.h[ibinc]      = walkerpool[iwin].h[ibin];
+         combSE[ibinc] = SE[iwin][ibin] + offS;
+         // Apply offset to S(E,M)
+         for(int j=0; j<NBinM; j++)
+         {
+            combined.S[ibinc*NBinM+j]      = walkerpool[iwin].S[ibin*NBinM+j] + offS;
+            combined.Sfixed[ibinc*NBinM+j] = walkerpool[iwin].Sfixed[ibin*NBinM+j];
+            combined.h[ibinc*NBinM+j]      = walkerpool[iwin].h[ibin*NBinM+j];
+         }
       }
-      ifar = istart+NBinW;
+      ifar = istart+NBinE;
    }
    double mval = *(std::max_element(combined.S.begin(),combined.S.end()));
    for(int ibin=0; ibin<NBinC; ibin++) combined.S[ibin] -= mval;
@@ -1409,55 +1397,34 @@ void MC_WangLandau::partition_windows(std::vector<double>& energy, std::vector<d
    // rooted in the code. That means all the windows need to be the same width until that
    // assumption is broken. Until then, just use the simple window paritioning.
    // MAY HAVE ALREADY REFACTORED THIS->NBIN OUT
+   // With g(E,M) functionality, it is now worse. Need to have NBinE and NBinM constant
+   // across windows.
    return this->partition_windows();
-#  if 0
-   if( !fout.is_open() ) fout.open("MC_WangLandau.txt");
-   int nel = energy.size();
-   if( nel<2 ) 
+}
+
+
+template<typename Walker>
+void MC_WangLandau::ReadSfixed(std::string fname, std::vector<Walker>& walkerpool)
+{
+   if( fname[0]==0 ) return;
+   for(int iw=0; iw<walkerpool.size(); iw++)
+      for(int i=0; i<walkerpool[iw].Sfixed.size(); i++) walkerpool[iw].Sfixed[i]=0;
+   std::string buff;
+   double E,M,lng;
+   std::ifstream input(fname.c_str());
+   while( input && input.is_open() && !input.eof() )
    {
-      fout << __FILE__ << ":" << __LINE__ << " partition_windows nel=" << nel << std::endl;
-      return partition_windows();
-   }
-   if( est_lng.size()!=nel ) return;
-   Elo = energy.front();
-   Ehi = energy.back();
-   Ewin.resize(2*NWindow);
-   int imax = 0;
-   double lng_max = est_lng[imax];
-   for(int i=0; i<nel; i++)
-      if( est_lng[i]>lng_max ) { imax=i; lng_max=est_lng[i]; }
-   if( imax>(nel-5) )
-   {
-      // Increasing function
-      double width = est_lng.back() - est_lng.front();
-      width /= static_cast<double>(NWindow);
-      int iwin = 0;
-      int ipt = 0;
-      while( iwin<NWindow )
+      std::getline(input,buff);
+      if( buff.size()>0 && buff[0]!='#' )
       {
-         Ewin[2*iwin] = energy[ipt];
-         double next = est_lng[ipt] + width;
-         while( ipt<nel && est_lng[ipt]<next ) ipt++;
-         iwin++;
+         sscanf(buff.c_str(),"%lf %lf %lf",&E,&M,&lng);
+         for(int iw=0; iw<walkerpool.size(); iw++)
+         {
+            if( E>=walkerpool[iw].WEmin && E<=walkerpool[iw].WEmax )
+               walkerpool[iw].Sfixed[ walkerpool[iw].window.bin(E,M) ] = lng;
+         }
       }
-      for(iwin=0; iwin<(NWindow-1); iwin++)
-      {
-         Ewin[2*iwin+1] = Ewin[2*(iwin+1)] + fwinover*(Ewin[2*(iwin+2)]-Ewin[2*(iwin+1)]);
-         if( Ewin[2*iwin+1] > Ehi ) Ewin[2*iwin+1] = Ehi;   // last window can't go outside range
-         if( Ewin[2*iwin] >= Ewin[2*iwin+1] ) Ewin[2*iwin] = Ewin[2*iwin-1] - fwinover*(Ewin[2*iwin-1]-Ewin[2*iwin-2]);
-      }   
-      Ewin[2*(NWindow-1)+0] = (Ewin[2*(NWindow-2)+1]+Ewin[2*(NWindow-2)])/2.; // Make last window stretch
-      Ewin[2*(NWindow-1)+1] = Ehi;                                            // From middle of neighbor to end
-      Ewin[0] = Elo;                                                          // When Nwindow==1
    }
-   else
-   {
-      // Maximum in-between
-      fout << __FILE__ << ":" << __LINE__ << " not implemented" << std::endl;
-      partition_windows();
-   }
-   return;
-#  endif
 }
 
 
@@ -1529,7 +1496,7 @@ void MC_WangLandau::init_pool(std::vector<Walker>& walkerpool)
             std::cout << __FILE__ << ":" << __LINE__ << " iwin=" << iwin << " Ewin.size()=" << Ewin.size() << " too small. NWindow=" << NWindow << std::endl;
          for(int iwalk=beginwin[iwin]; iwalk<beginwin[iwin+1]; iwalk++) 
          {
-            walkerpool[iwalk].window.set_delta(Ewin[2*iwin],Ewin[2*iwin+1],iwin,Ebin);
+            walkerpool[iwalk].window.set(Ewin[2*iwin],Ewin[2*iwin+1],Ebin,Mlo,Mhi,Mbin,iwin);
             walkerpool[iwalk].WEmin = walkerpool[iwalk].window.Elo; // Ewin[2*iwin];
             walkerpool[iwalk].WEmax = walkerpool[iwalk].window.Ehi; // Ewin[2*iwin+1];
             walkerpool[iwalk].clear_histogram();
@@ -1548,12 +1515,13 @@ void MC_WangLandau::init_pool(std::vector<Walker>& walkerpool)
    else
    {
       // Parallel
-      if(verbose) std::cout << __FILE__ << ":" << __LINE__ <<  " Parallel windows NWindow=" << NWindow << " Global Window = [" << Elo << "," << Ehi << "]" << std::endl;
+      if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " Parallel windows NWindow=" << NWindow << " Global Window = [" << Elo << "," << Ehi << "]" << std::endl;
       int iwin = mp_window.igang;
+      if(verbose) std::cout << __FILE__ << ":" << __LINE__ << " iproc=" << mp_window.pool.iproc << " igang=" << mp_window.igang << " iwin=" << iwin << std::endl;
       for(int iwalk=0; iwalk<NWalker; iwalk++)
       {
          // walkerpool[iwalk].window.set(Ewin[2*iwin],Ewin[2*iwin+1],iwin,nbin);
-         walkerpool[iwalk].window.set_delta(Ewin[2*iwin],Ewin[2*iwin+1],iwin,Ebin);
+         walkerpool[iwalk].window.set(Ewin[2*iwin],Ewin[2*iwin+1],Ebin,Mlo,Mhi,Mbin,iwin);
          walkerpool[iwalk].WEmin = walkerpool[iwalk].window.Elo; // Ewin[2*iwin];
          walkerpool[iwalk].WEmax = walkerpool[iwalk].window.Ehi; // Ewin[2*iwin+1];
          walkerpool[iwalk].clear_histogram();
@@ -1627,9 +1595,11 @@ void MC_WangLandau::DoReplicaExchange_serial(Model& model, std::vector<Walker>& 
       int ileft = iwalkL + iwalk;
       int irgt = iwalkM + ( (iwalk+comm_shift) % nwalk );
       double E_left = walkerpool[ileft].now.E;
+      double M_left = walkerpool[ileft].now.M;
       double E_rght = walkerpool[irgt].now.E;
-      double Pacc = walkerpool[irgt].get_lndos(E_rght,LinearInterp) - walkerpool[irgt].get_lndos(E_left,LinearInterp)
-                  + walkerpool[ileft].get_lndos(E_left,LinearInterp) - walkerpool[ileft].get_lndos(E_rght,LinearInterp);
+      double M_rght = walkerpool[irgt].now.M;
+      double Pacc = walkerpool[irgt].get_lndos(E_rght,M_rght,LinearInterp) - walkerpool[irgt].get_lndos(E_left,M_left,LinearInterp)
+                  + walkerpool[ileft].get_lndos(E_left,M_left,LinearInterp) - walkerpool[ileft].get_lndos(E_rght,M_rght,LinearInterp);
       if( Pacc>0 ) Pacc = 0;                                                                   // Pacc = min[ ln(1), ln(ratio_R*ratio_L) ]
       bool accept = static_cast<int>( urng()<std::exp(Pacc) );                                 // convert probability into an action
       if( accept )
@@ -1672,11 +1642,14 @@ void MC_WangLandau::DoReplicaExchange(Model& model, std::vector<Walker>& walkerp
    int jproc_pool = mp_window.pool.nproc;
    MPI_Datatype MPIConfigType = MPITypeTraits<typename Walker::ConfigType::value_type>::mpitype;
    int twonwalk = 2*nwalk;
-   double dbuffer[4*nwalk];                           // (E_left,E_right,lng_right,lng_left/lng_right)
+   int threenwalk = 3*nwalk;
+   double dbuffer[6*nwalk];                           // (E_left,M_left,E_right,M_right,lng_right,lng_left/lng_right)
    double *E_left    = dbuffer + 0*nwalk;
-   double *E_right   = dbuffer + 1*nwalk;
-   double *lng_right = dbuffer + 2*nwalk;
-   double *lng_ratio = dbuffer + 3*nwalk;
+   double *M_left    = dbuffer + 1*nwalk;
+   double *E_right   = dbuffer + 2*nwalk;
+   double *M_right   = dbuffer + 3*nwalk;
+   double *lng_right = dbuffer + 4*nwalk;
+   double *lng_ratio = dbuffer + 5*nwalk;
    int    ibuffer[nwalk];
    int    *accept    = ibuffer;
    if( send_right==when_right )                       // true,true or false,false
@@ -1694,10 +1667,12 @@ void MC_WangLandau::DoReplicaExchange(Model& model, std::vector<Walker>& walkerp
          // STEP 1: Swap E_left and (E_right,lng_right)
          for(int iwalk=0; iwalk<nwalk; iwalk++)
             E_left[iwalk] = walkerpool[iwalk].now.E;
-         MPI_Send(E_left,nwalk,MPI_DOUBLE,jproc_pool,0,mp_window.pool.comm);
-         MPI_Recv(E_right,twonwalk,MPI_DOUBLE,jproc_pool,1,mp_window.pool.comm,&status);
+         for(int iwalk=0; iwalk<nwalk; iwalk++)
+            M_left[iwalk] = walkerpool[iwalk].now.M;
+         MPI_Send(E_left,twonwalk,MPI_DOUBLE,jproc_pool,0,mp_window.pool.comm);                    // E,M
+         MPI_Recv(E_right,threenwalk,MPI_DOUBLE,jproc_pool,1,mp_window.pool.comm,&status);         // E,M,lng_right
          // STEP 2: Return lng_left/lng_right
-         MPI_Recv(lng_ratio,nwalk,MPI_DOUBLE,jproc_pool,2,mp_window.pool.comm,&status);
+         MPI_Recv(lng_ratio,nwalk,MPI_DOUBLE,jproc_pool,2,mp_window.pool.comm,&status);            // lng_left/lng_right
          // STEP 3: Send Accept
          // Thomas Vogel, Ying Wai Li, Thomas Wust, and David P. Landau
          // Generic, Hierarchical Framework for Massively Parallel Wang-Landau Sampling
@@ -1713,7 +1688,8 @@ void MC_WangLandau::DoReplicaExchange(Model& model, std::vector<Walker>& walkerp
          {
             // from below: lng_ratio[iwalk] = walkerpool[iwalk].get_lndos(E_left[iwalk]) - lng_right[iwalk];
             //             this is g_j(E(Y))/g_j(E(X)) = g_L(E_L)/g_L(E_R) 
-            double Pacc = walkerpool[iwalk].get_lndos(E_right[iwalk],LinearInterp) - walkerpool[iwalk].get_lndos(E_left[iwalk],LinearInterp)
+            double Pacc = walkerpool[iwalk].get_lndos(E_right[iwalk],M_right[iwalk],LinearInterp) 
+                        - walkerpool[iwalk].get_lndos(E_left[iwalk],M_left[iwalk],LinearInterp)
                         + lng_ratio[iwalk];
             if( Pacc>0 ) Pacc = 0;                                       // Pacc = min[ ln(1), ln(ratio_R*ratio_L) ]
             accept[iwalk] = static_cast<int>( urng()<std::exp(Pacc) );   // convert probability into an action
@@ -1750,14 +1726,15 @@ void MC_WangLandau::DoReplicaExchange(Model& model, std::vector<Walker>& walkerp
          for(int iwalk=0; iwalk<nwalk; iwalk++)
          {
             E_right[iwalk]   = walkerpool[iwalk].now.E;
-            lng_right[iwalk] = walkerpool[iwalk].get_lndos(E_right[iwalk],LinearInterp);
+            M_right[iwalk]   = walkerpool[iwalk].now.M;
+            lng_right[iwalk] = walkerpool[iwalk].get_lndos(E_right[iwalk],M_right[iwalk],LinearInterp);
          }
-         MPI_Recv(E_left,nwalk,MPI_DOUBLE,jproc_pool,0,mp_window.pool.comm,&status);
-         MPI_Send(E_right,twonwalk,MPI_DOUBLE,jproc_pool,1,mp_window.pool.comm);
+         MPI_Recv(E_left,twonwalk,MPI_DOUBLE,jproc_pool,0,mp_window.pool.comm,&status);
+         MPI_Send(E_right,threenwalk,MPI_DOUBLE,jproc_pool,1,mp_window.pool.comm);
          // STEP 2: Return lng_left/lng_right
          for(int iwalk=0; iwalk<nwalk; iwalk++)
          {
-            lng_ratio[iwalk] = walkerpool[iwalk].get_lndos(E_left[iwalk],LinearInterp) - lng_right[iwalk];
+            lng_ratio[iwalk] = walkerpool[iwalk].get_lndos(E_left[iwalk],M_left[iwalk],LinearInterp) - lng_right[iwalk];
          }
          MPI_Send(lng_ratio,nwalk,MPI_DOUBLE,jproc_pool,2,mp_window.pool.comm);
          // STEP 3: Send Accept
