@@ -1,7 +1,7 @@
 #ifndef WLWalker_HPP_
 #define WLWalker_HPP_
 
-#include "WL_Window.hpp"
+#include "WL_Window2d.hpp"
 #include "MC_Walker.hpp"
 
 #include <iostream>
@@ -32,7 +32,7 @@ public:
 
    double               wlgamma;            // Wang-Landau gamma = ln(f)
    WL_State             wl_now,wl_old;      // Wang-Landau information
-   WL_Window            window;             // Wang-Landau Window provides limits and binning
+   WL_Window2d          window;             // Wang-Landau Window provides limits and binning
    std::vector<double>  S;                  // Entropy = log-density-of-states
    std::vector<double>  Slast;              // Last set of values, used to check convergence
    std::vector<double>  Sfixed;             // Changes only very slowly
@@ -69,6 +69,7 @@ public:
    } 
 
    // Set values of member array. Window must already be set
+   // "seq" returns the values interpolated to E of this system
    void set_values(const std::vector<double>& E, const std::vector<double>& y, std::vector<double>& seq)
    {
       const int nread = E.size();
@@ -86,7 +87,7 @@ public:
       seq.resize(nbin);
       for(int ibin=0; ibin<nbin; ibin++)
       {
-         double Eset = window.unbin(ibin);
+         double Eset = window.unbinE(ibin);
          while( iread<nread && E[iread]<Eset ) iread++;
          if(iread>=nread) iread = nread-1;
          if(iread<1) iread = 1;
@@ -131,15 +132,18 @@ public:
    }
 
    // Use this to find the current bin of the walker
-   int bin() { return wl_now.ibin = window.bin(BASE::now.E); }
+   int bin() { return wl_now.ibin = window.bin(BASE::now.E,BASE::now.M); }
 
    // Estimate Entropy/lndos using linear interpolation
-   double get_lndos(double E, bool LinearInterp=true)
+   // WL_Walker ignores M, WL_Walker2d uses it
+   double get_lndos(double E, double M, bool LinearInterp=true)
    {
-      int ibin = window.bin(E);
-      double E0 = window.unbin(ibin);
+      int ibin = window.bin(E,M);
       double S0 = S[ibin] + Sfixed[ibin];
-      if( !LinearInterp ) return S0;
+      if( window.NBinM<=1 || !LinearInterp ) return S0;
+      std::cout << __FILE__ << ":" << __LINE__ << " LinearInterp does not work with 2d binning! NBinM=" << window.NBinM << std::endl;
+      return S0;
+      double E0 = window.unbinE(ibin);
       double S1,E1;
       if( E<E0 ) 
       {
@@ -152,7 +156,7 @@ public:
          }
          else
          {
-            E1 = window.unbin(ibin-1);
+            E1 = window.unbinE(ibin-1);
             S1 = S[ibin-1] + Sfixed[ibin-1]; 
          }
       }
@@ -166,7 +170,7 @@ public:
          }
          else
          {
-            E1 = window.unbin(ibin+1);
+            E1 = window.unbinE(ibin+1);
             S1 = S[ibin+1] + Sfixed[ibin+1];
          }
       }
